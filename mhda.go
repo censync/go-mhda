@@ -13,6 +13,7 @@ type MHDA interface {
 	DerivationPath() DerivationPath
 	Algorithm() Algorithm
 	Format() Format
+	NSS() string
 	String() string
 }
 
@@ -237,7 +238,11 @@ func (a *Address) SetAddressSuffix(as string) error {
 }
 
 func (a *Address) String() string {
-	result := fmt.Sprintf(`urn:mhda:nt:%s`, a.chain.networkType)
+	return fmt.Sprintf(`urn:mhda:%s`, a.NSS())
+}
+
+func (a *Address) NSS() string {
+	result := fmt.Sprintf(`nt:%s`, a.chain.networkType)
 
 	if a.path.derivationType != ROOT {
 		result += fmt.Sprintf(`:dt:%s:dp:%s`, a.path.derivationType, a.path.String())
