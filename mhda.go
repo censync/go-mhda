@@ -17,36 +17,6 @@ type MHDA interface {
 	String() string
 }
 
-type Chain struct {
-	networkType NetworkType
-	coinType    CoinType
-	chainId     ChainId
-}
-
-func (c *Chain) SetNetworkType(networkType NetworkType) {
-	c.networkType = networkType
-}
-
-func (c *Chain) SetCoinType(coinType CoinType) {
-	c.coinType = coinType
-}
-
-func (c *Chain) SetChainId(chainId ChainId) {
-	c.chainId = chainId
-}
-
-func (c *Chain) NetworkType() NetworkType {
-	return c.networkType
-}
-
-func (c *Chain) CoinType() CoinType {
-	return c.coinType
-}
-
-func (c *Chain) ChainId() ChainId {
-	return c.chainId
-}
-
 type Address struct {
 	chain *Chain
 	//derivationType   DerivationType
