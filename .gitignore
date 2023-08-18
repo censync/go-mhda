@@ -1,0 +1,5 @@
+*.test
+*.out
+vendor/
+.idea/
+.env
