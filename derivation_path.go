@@ -51,7 +51,7 @@ func (p *DerivationPath) Charge() ChargeType {
 	return p.charge
 }
 
-func (p *DerivationPath) Index() AddressIndex {
+func (p *DerivationPath) AddressIndex() AddressIndex {
 	return p.index
 }
 
