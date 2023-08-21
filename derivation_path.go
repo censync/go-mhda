@@ -55,7 +55,7 @@ func (p *DerivationPath) Index() AddressIndex {
 	return p.index
 }
 
-func (p *DerivationPath) IsHardened() bool {
+func (p *DerivationPath) IsHardenedAddress() bool {
 	return p.index.IsHardened
 }
 
