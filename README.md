@@ -16,7 +16,7 @@ urn:mhda:nt:{network_type}:dt:{derivation_type}:dp:{derivation_path}:ct:{coin_ty
 |:-------------:|:--------------------:|:--------:|:--------------:|----------------------------------------------------------------------------------------------------------------------|
 |      urn      |    URN Namespace     | constant |     string     | "mhda"                                                                                                               |
 |      nt       |     Network Type     | required |     string     | Network type, grouped by name: "evm", "tvm", "avm", "btc", "cosmos"                                                  |                                                             |
-|      dt       | Derivation Path Type | required |     string     | Derivation path type by name: "root", "bip32", "bip44", "bip49", "bip84", "cip11"                                    |
+|      dt       | Derivation Path Type | optional |     string     | Derivation path type by name: "root", "bip32", "bip44", "bip49", "bip84", "cip11"                                    |
 |      dp       |   Derivation Path    | optional | string \| null | Derivation path, according *dt* parameter: null, "m/0'/0/0", "m/44'/0'/0'/0/0", "m/49'/0'/0'/0/0", "m/84h/0h/0h/0/0" |
 |      ct       |      Coin Type       | required |    numeric     | Coin type, according slip44: Bitcoin/BTC=0, Litecoin/LTC=2, Ethereum/ETH=60, Tron/TRX=195, Polygon/MATIC=966         |
 |      ci       |       Chain Id       | required |     string     | Chain id: for numeric - "0x1", "0x10", for another - string "axelar"                                                 |
