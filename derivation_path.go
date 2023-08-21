@@ -55,6 +55,10 @@ func (p *DerivationPath) Index() AddressIndex {
 	return p.index
 }
 
+func (p *DerivationPath) IsHardened() bool {
+	return p.index.IsHardened
+}
+
 var (
 	rxRoot = regexp.MustCompile("")
 
