@@ -1,6 +1,8 @@
 package go_mhda
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -15,6 +17,8 @@ type MHDA interface {
 	Format() Format
 	NSS() string
 	String() string
+	Hash() string
+	NSSHash() string
 }
 
 type Address struct {
@@ -224,4 +228,16 @@ func (a *Address) NSS() string {
 	// TODO: use additional params, when address has non-default values
 
 	return result
+}
+
+func (a *Address) Hash() string {
+	h := sha1.New()
+	h.Write([]byte(a.String()))
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func (a *Address) NSSHash() string {
+	h := sha1.New()
+	h.Write([]byte(a.NSS()))
+	return hex.EncodeToString(h.Sum(nil))
 }
