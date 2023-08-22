@@ -60,16 +60,18 @@ func ParseURNRx(src string) (MHDA, error) {
 
 	return nil, nil
 }
-
 func ParseURN(src string) (MHDA, error) {
-	var componentsNamesTmp = make([]string, len(componentsNames))
 	if !strings.HasPrefix(src, prefixMHDA) {
 		return nil, errors.New("source string is not valid URN MHDA")
 	}
 
-	copy(componentsNamesTmp, componentsNames)
+	return ParseNSS(src[prefixOffset:])
+}
 
-	nss := src[prefixOffset:]
+func ParseNSS(nss string) (MHDA, error) {
+	var componentsNamesTmp = make([]string, len(componentsNames))
+
+	copy(componentsNamesTmp, componentsNames)
 
 	components := map[string]string{}
 

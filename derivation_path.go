@@ -14,6 +14,9 @@ const (
 	BIP84 = DerivationType(`bip84`)
 	CIP11 = DerivationType(`cip11`)
 	ZIP32 = DerivationType(`zip32`)
+
+	ChargeExternal = ChargeType(0)
+	ChargeInternal = ChargeType(1)
 )
 
 type DerivationType string
@@ -35,27 +38,27 @@ type DerivationPath struct {
 	index          AddressIndex
 }
 
-func (p *DerivationPath) DerivationType() DerivationType {
+func (p DerivationPath) DerivationType() DerivationType {
 	return p.derivationType
 }
 
-func (p *DerivationPath) Coin() CoinType {
+func (p DerivationPath) Coin() CoinType {
 	return p.coin
 }
 
-func (p *DerivationPath) Account() AccountIndex {
+func (p DerivationPath) Account() AccountIndex {
 	return p.account
 }
 
-func (p *DerivationPath) Charge() ChargeType {
+func (p DerivationPath) Charge() ChargeType {
 	return p.charge
 }
 
-func (p *DerivationPath) AddressIndex() AddressIndex {
+func (p DerivationPath) AddressIndex() AddressIndex {
 	return p.index
 }
 
-func (p *DerivationPath) IsHardenedAddress() bool {
+func (p DerivationPath) IsHardenedAddress() bool {
 	return p.index.IsHardened
 }
 
@@ -132,7 +135,7 @@ func ParsePath(dt DerivationType, path string) (*DerivationPath, error) {
 	}, nil
 }
 
-func (p *DerivationPath) String() string {
+func (p DerivationPath) String() string {
 	var result string
 
 	switch p.derivationType {
