@@ -11,8 +11,8 @@ import (
 
 type MHDA interface {
 	Chain() Chain
-	DerivationType() DerivationType
-	DerivationPath() DerivationPath
+	// DerivationType() DerivationType
+	DerivationPath() *DerivationPath
 	Algorithm() Algorithm
 	Format() Format
 	NSS() string
@@ -22,23 +22,34 @@ type MHDA interface {
 }
 
 type Address struct {
-	chain *Chain
-	//derivationType   DerivationType
-	path             DerivationPath
+	chain            *Chain
+	path             *DerivationPath
 	addressAlgorithm Algorithm
 	addressFormat    Format
 	addressPrefix    string
 	addressSuffix    string
 }
 
-func NewAddress(m map[string]string) (MHDA, error) {
+// NewAddress  add optional params: aa, af, ap, as
+func NewAddress(chain *Chain, path *DerivationPath, params ...string) *Address {
+	return &Address{chain: chain, path: path}
+}
+
+func parseAddress(m map[string]string) (MHDA, error) {
 	var err error
+
+	networkType := strings.TrimSpace(m[compNetworkType])
+
+	// TODO: Check coin type extraction from derivation path??? subnets???
+	if networkType == `` {
+		return nil, errors.New(`"networkType" required`)
+	}
 
 	ct := strings.TrimSpace(m[compCoinType])
 
 	// TODO: Check coin type extraction from derivation path??? subnets???
 	if ct == `` {
-		return nil, errors.New(`"ct" required for "ct=evm"`)
+		return nil, errors.New(`"ct" required`)
 	}
 
 	coinType, err := strconv.ParseUint(ct, 0, 32)
@@ -53,7 +64,7 @@ func NewAddress(m map[string]string) (MHDA, error) {
 
 	mhda := &Address{
 		chain: &Chain{
-			networkType: EthereumVM,
+			networkType: NetworkType(networkType), // TODO: Add validation
 			coinType:    CoinType(coinType),
 			chainId:     ChainId(m[compChainId]),
 		},
@@ -97,11 +108,11 @@ func (a *Address) Chain() Chain {
 	return *a.chain
 }
 
-func (a *Address) DerivationType() DerivationType {
+/*func (a *Address) DerivationType() DerivationType {
 	return a.path.derivationType
-}
+}*/
 
-func (a *Address) DerivationPath() DerivationPath {
+func (a *Address) DerivationPath() *DerivationPath {
 	return a.path
 }
 
@@ -116,6 +127,10 @@ func (a *Address) Format() Format {
 func (a *Address) SetDerivationType(dt string) error {
 	dt = strings.TrimSpace(dt)
 	dt = strings.ToLower(dt)
+
+	if a.path == nil {
+		a.path = &DerivationPath{}
+	}
 
 	if dt != `` {
 		if _, ok := derivationIndex[DerivationType(dt)]; !ok {
@@ -142,6 +157,10 @@ func (a *Address) SetDerivationPath(dp string) error {
 
 	if !rx.MatchString(dp) {
 		return errors.New(fmt.Sprintf(`"dp" param has wrong value "%s"`, dp))
+	}
+
+	if a.path == nil {
+		a.path = &DerivationPath{}
 	}
 
 	return nil

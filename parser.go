@@ -123,5 +123,5 @@ func ParseNSS(nss string) (MHDA, error) {
 		return nil, errors.New(`"nt" not defined`)
 	}
 
-	return NewAddress(components)
+	return parseAddress(components)
 }
