@@ -38,6 +38,10 @@ type DerivationPath struct {
 	index          AddressIndex
 }
 
+func NewDerivationPath(derivationType DerivationType, coin CoinType, account AccountIndex, charge ChargeType, index AddressIndex) *DerivationPath {
+	return &DerivationPath{derivationType: derivationType, coin: coin, account: account, charge: charge, index: index}
+}
+
 func (p DerivationPath) DerivationType() DerivationType {
 	return p.derivationType
 }
