@@ -39,7 +39,37 @@ type DerivationPath struct {
 }
 
 func NewDerivationPath(derivationType DerivationType, coin CoinType, account AccountIndex, charge ChargeType, index AddressIndex) *DerivationPath {
-	return &DerivationPath{derivationType: derivationType, coin: coin, account: account, charge: charge, index: index}
+	return &DerivationPath{
+		derivationType: derivationType,
+		coin:           coin,
+		account:        account,
+		charge:         charge,
+		index:          index,
+	}
+}
+
+func ParseDerivationPath(dt DerivationType, path string) (*DerivationPath, error) {
+	rx, ok := derivationIndex[dt]
+
+	if !ok {
+		return nil, errors.New("wrong derivation type")
+	}
+
+	if !rx.MatchString(path) {
+		return nil, errors.New("incorrect derivation path")
+	}
+
+	dPath := &DerivationPath{
+		derivationType: dt,
+	}
+
+	err := dPath.ParsePath(path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return dPath, nil
 }
 
 func (dp *DerivationPath) DerivationType() DerivationType {
