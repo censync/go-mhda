@@ -146,6 +146,10 @@ func (a *Address) SetDerivationType(dt string) error {
 }
 
 func (a *Address) SetDerivationPath(dp string) error {
+	if a.path.derivationType == ROOT {
+		return nil
+	}
+
 	rx, ok := derivationIndex[a.path.derivationType]
 
 	if !ok {
@@ -159,11 +163,7 @@ func (a *Address) SetDerivationPath(dp string) error {
 		return errors.New(fmt.Sprintf(`"dp" param has wrong value "%s"`, dp))
 	}
 
-	if a.path == nil {
-		a.path = &DerivationPath{}
-	}
-
-	return nil
+	return a.path.ParsePath(dp)
 }
 
 func (a *Address) SetCoinType(ct string) error {

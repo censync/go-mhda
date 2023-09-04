@@ -42,28 +42,28 @@ func NewDerivationPath(derivationType DerivationType, coin CoinType, account Acc
 	return &DerivationPath{derivationType: derivationType, coin: coin, account: account, charge: charge, index: index}
 }
 
-func (p DerivationPath) DerivationType() DerivationType {
-	return p.derivationType
+func (dp *DerivationPath) DerivationType() DerivationType {
+	return dp.derivationType
 }
 
-func (p DerivationPath) Coin() CoinType {
-	return p.coin
+func (dp *DerivationPath) Coin() CoinType {
+	return dp.coin
 }
 
-func (p DerivationPath) Account() AccountIndex {
-	return p.account
+func (dp *DerivationPath) Account() AccountIndex {
+	return dp.account
 }
 
-func (p DerivationPath) Charge() ChargeType {
-	return p.charge
+func (dp *DerivationPath) Charge() ChargeType {
+	return dp.charge
 }
 
-func (p DerivationPath) AddressIndex() AddressIndex {
-	return p.index
+func (dp *DerivationPath) AddressIndex() AddressIndex {
+	return dp.index
 }
 
-func (p DerivationPath) IsHardenedAddress() bool {
-	return p.index.IsHardened
+func (dp *DerivationPath) IsHardenedAddress() bool {
+	return dp.index.IsHardened
 }
 
 var (
@@ -79,7 +79,8 @@ var (
 
 	// https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki
 	// m / 84 ' / 0 ' / account ' / charge / address
-	rxBip84 = regexp.MustCompile(`^m/84[Hh']/0[Hh']/([0-9]+)[Hh']/(0|1)/([0-9]+)([Hh'])?$`)
+	// TODO: Check for hardened index
+	rxBip84 = regexp.MustCompile(`^m/84[Hh']/0[Hh']/([0-9]+)[Hh']/(0|1)/([0-9]+)?$`)
 
 	// https://github.com/confio/cosmos-hd-key-derivation-spec
 	// m / 44 ' / 118 ' / account ' / charge_extra / address
@@ -101,80 +102,80 @@ var (
 	}
 )
 
-func ParsePath(dt DerivationType, path string) (*DerivationPath, error) {
+func (dp *DerivationPath) ParsePath(path string) error {
 	var isAddressHardened = false
-	matches := derivationIndex[dt].FindStringSubmatch(path)
+	matches := derivationIndex[dp.derivationType].FindStringSubmatch(path)
+	// TODO: Fix serialization for different length
 	if len(matches) < 5 {
-		return nil, errors.New(fmt.Sprintf("cannot parse path: %s", path))
+		return errors.New(fmt.Sprintf("cannot parse path: %s", path))
 	}
-	networkType, err := strconv.ParseUint(matches[1], 10, 32)
+	coinType, err := strconv.ParseUint(matches[1], 10, 32)
 	if err != nil {
-		return nil, err
+		return errors.New("cannot parse coin")
 	}
 	accountIndex, err := strconv.ParseUint(matches[2], 10, 32)
 	if err != nil {
-		return nil, err
+		return errors.New("cannot parse account")
 	}
 	chargeType, err := strconv.ParseUint(matches[3], 10, 32)
 	if err != nil {
-		return nil, err
+		return errors.New("cannot parse charge")
 	}
 	addressIndex, err := strconv.ParseUint(matches[4], 10, 32)
 	if err != nil {
-		return nil, err
+		return errors.New("cannot parse index")
 	}
 	if len(matches) == 6 && matches[5] != "" {
 		isAddressHardened = true
 	}
 
-	return &DerivationPath{
-		derivationType: dt,
-		coin:           CoinType(networkType),
-		account:        AccountIndex(accountIndex),
-		charge:         ChargeType(chargeType),
-		index: AddressIndex{
-			Index:      uint32(addressIndex),
-			IsHardened: isAddressHardened,
-		},
-	}, nil
+	dp.coin = CoinType(coinType)
+	dp.account = AccountIndex(accountIndex)
+	dp.charge = ChargeType(chargeType)
+	dp.index = AddressIndex{
+		Index:      uint32(addressIndex),
+		IsHardened: isAddressHardened,
+	}
+
+	return nil
 }
 
-func (p DerivationPath) String() string {
+func (dp *DerivationPath) String() string {
 	var result string
 
-	switch p.derivationType {
+	switch dp.derivationType {
 	case ROOT:
 		return ``
 	case BIP32:
 		var format = "m/%d'/%d/%d"
-		if p.index.IsHardened {
+		if dp.index.IsHardened {
 			format += `'`
 		}
-		return fmt.Sprintf(format, p.account, p.charge, p.index.Index)
+		return fmt.Sprintf(format, dp.account, dp.charge, dp.index.Index)
 	case BIP44:
 		var format = "m/44'/%d'/%d'/%d/%d"
-		if p.index.IsHardened {
+		if dp.index.IsHardened {
 			format += `'`
 		}
-		return fmt.Sprintf(format, p.coin, p.account, p.charge, p.index.Index)
+		return fmt.Sprintf(format, dp.coin, dp.account, dp.charge, dp.index.Index)
 	case BIP84:
 		var format = "m/84'/%d'/%d'/%d/%d"
-		if p.index.IsHardened {
+		if dp.index.IsHardened {
 			format += `'`
 		}
-		return fmt.Sprintf(format, p.coin, p.account, p.charge, p.index.Index)
+		return fmt.Sprintf(format, dp.coin, dp.account, dp.charge, dp.index.Index)
 	case CIP11:
 		var format = "m/44'/133'/%d'/%d/%d"
-		if p.index.IsHardened {
+		if dp.index.IsHardened {
 			format += `'`
 		}
-		return fmt.Sprintf(format, p.account, p.charge, p.index.Index)
+		return fmt.Sprintf(format, dp.account, dp.charge, dp.index.Index)
 	case ZIP32:
 		var format = "m/32'/133'/%d'/%d"
-		if p.index.IsHardened {
+		if dp.index.IsHardened {
 			format += `'`
 		}
-		return fmt.Sprintf(format, p.account, p.index.Index)
+		return fmt.Sprintf(format, dp.account, dp.index.Index)
 	}
 
 	return result
