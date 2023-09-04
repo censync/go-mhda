@@ -8,7 +8,8 @@ const (
 
 	// evm
 	ETH   = CoinType(60)
-	BNB   = CoinType(714)
+	BNB   = CoinType(714) // old stype
+	BSC   = CoinType(9006)
 	MATIC = CoinType(966)
 
 	DASH = CoinType(5)
