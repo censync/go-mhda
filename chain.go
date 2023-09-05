@@ -1,6 +1,8 @@
 package go_mhda
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type ChainId string
 

@@ -11,6 +11,7 @@ const (
 	BNB   = CoinType(714) // old stype
 	BSC   = CoinType(9006)
 	MATIC = CoinType(966)
+	GLMR  = CoinType(1284)
 
 	DASH = CoinType(5)
 
