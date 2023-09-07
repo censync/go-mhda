@@ -2,6 +2,7 @@ package go_mhda
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -95,6 +96,7 @@ func ParseNSS(nss string) (MHDA, error) {
 						(nss[iterVal] >= 97 && nss[iterVal] <= 122) || // 97-122 [a-z]
 						(nss[iterVal] >= 35 && nss[iterVal] <= 47) || // 35-47 [!#$%&'()*+,-./]
 						(nss[iterVal] >= 65 && nss[iterVal] <= 90) || // 65-90 [A-Z]
+						nss[iterVal] == 95 || // 95 [_]
 						nss[iterVal] == 33 || // 33 [!]
 						nss[iterVal] == 59 || // 59 [;]
 						nss[iterVal] == 61 || // 61 [=]
@@ -104,7 +106,10 @@ func ParseNSS(nss string) (MHDA, error) {
 						isFound = true
 						componentValue += nss[iterVal : iterVal+1]
 						iterVal++
+					} else {
+						return nil, fmt.Errorf("cannot parse nss: wrong symbol %q, pos %d", nss[iterVal], iterVal)
 					}
+
 				}
 				components[componentIndex] = componentValue
 				if isFound {
