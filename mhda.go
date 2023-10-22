@@ -10,7 +10,7 @@ import (
 )
 
 type MHDA interface {
-	Chain() Chain
+	Chain() *Chain
 	// DerivationType() DerivationType
 	DerivationPath() *DerivationPath
 	Algorithm() Algorithm
@@ -82,8 +82,8 @@ func parseAddress(m map[string]string) (MHDA, error) {
 	return mhda, nil
 }
 
-func (a *Address) Chain() Chain {
-	return *a.chain
+func (a *Address) Chain() *Chain {
+	return a.chain
 }
 
 /*func (a *Address) DerivationType() DerivationType {
