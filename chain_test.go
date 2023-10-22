@@ -4,10 +4,10 @@ import "testing"
 
 var (
 	nssChainKey = []string{
-		`nt=btc:ct=0:ci=bitcoin`,   // Bitcoin
-		`nt=tvm:ct=195:ci=mainnet`, // Tron
-		`nt=evm:ct=60:ci=0x1`,      // Ethereum
-		`nt=evm:ct=0:ci=0xa86a`,    // Avalanche
+		`nt:btc:ct:0:ci:bitcoin`,   // Bitcoin
+		`nt:tvm:ct:195:ci:mainnet`, // Tron
+		`nt:evm:ct:60:ci:0x1`,      // Ethereum
+		`nt:evm:ct:60:ci:0xa86a`,   // Avalanche
 	}
 )
 

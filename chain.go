@@ -113,5 +113,5 @@ func (c *Chain) Key() ChainKey {
 }
 
 func (c *Chain) String() string {
-	return fmt.Sprintf("nt=%s:ct=%d:ci=%s", c.networkType, c.CoinType(), c.chainId)
+	return fmt.Sprintf("nt:%s:ct:%d:ci:%s", c.networkType, c.CoinType(), c.chainId)
 }
