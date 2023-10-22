@@ -23,9 +23,9 @@ func TestParse(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// if addr.String() != uriMHDA[i] {
-		// 	t.Fatal("mismatch result", addr.String(), uriMHDA[i])
-		// }
+		/*if addr.String() != uriMHDA[i] {
+			t.Fatal("mismatch result", addr.String(), uriMHDA[i])
+		}*/
 	}
 }
 

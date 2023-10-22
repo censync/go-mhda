@@ -25,15 +25,20 @@ const (
 )
 
 var (
-	componentsNames = []string{`nt`, `dt`, `dp`, `ct`, `ci`, `aa`, `af`, `ap`, `as`}
+	componentsNames = []string{
+		compNetworkType,
+		compDerivationType,
+		compDerivationPath,
+		compCoinType,
+		compChainId,
+		compAddressAlgorithm,
+		compAddressFormat,
+		compAddressPrefix,
+		compAddressSuffix,
+	}
 
 	rxComponent = regexp.MustCompile(`:(nt|dt|dp|ct|ci|aa|af|ap|as):([0-9a-z-._~*+=%$&@?'()!,;/#]+)`)
 )
-
-type urn struct {
-	nid        string
-	components map[string]string
-}
 
 // TODO: Match to RFC 8141
 
@@ -69,19 +74,33 @@ func ParseURN(src string) (MHDA, error) {
 	return ParseNSS(src[prefixOffset:])
 }
 
-func ParseNSS(nss string) (MHDA, error) {
+func ParseNSS(src string) (MHDA, error) {
 	var componentsNamesTmp = make([]string, len(componentsNames))
 
 	copy(componentsNamesTmp, componentsNames)
 
-	components := map[string]string{}
+	components, err := parseNSS(src, componentsNamesTmp)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if _, ok := components[compNetworkType]; !ok {
+		return nil, errors.New(`"nt" not defined`)
+	}
+
+	return parseAddress(components)
+}
+
+func parseNSS(nss string, components []string) (map[string]string, error) {
+	result := map[string]string{}
 
 	iter := 0
 
 	for iter < len(nss) {
 		var isFound bool
-		for i := range componentsNamesTmp {
-			if nss[iter] == componentsNamesTmp[i][0] && nss[iter+1] == componentsNamesTmp[i][1] {
+		for i := range components {
+			if nss[iter] == components[i][0] && nss[iter+1] == components[i][1] {
 				componentIndex := nss[iter : iter+2]
 				componentValue := ``
 				iterVal := iter + 3
@@ -111,9 +130,9 @@ func ParseNSS(nss string) (MHDA, error) {
 					}
 
 				}
-				components[componentIndex] = componentValue
+				result[componentIndex] = componentValue
 				if isFound {
-					componentsNamesTmp = append(componentsNamesTmp[:i], componentsNamesTmp[i+1:]...)
+					components = append(components[:i], components[i+1:]...)
 					iter = iterVal + 1
 					break
 				}
@@ -123,10 +142,5 @@ func ParseNSS(nss string) (MHDA, error) {
 			iter += 3
 		}
 	}
-
-	if _, ok := components[compNetworkType]; !ok {
-		return nil, errors.New(`"nt" not defined`)
-	}
-
-	return parseAddress(components)
+	return result, nil
 }

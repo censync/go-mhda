@@ -38,36 +38,14 @@ func NewAddress(chain *Chain, path *DerivationPath, params ...string) *Address {
 func parseAddress(m map[string]string) (MHDA, error) {
 	var err error
 
-	networkType := strings.TrimSpace(m[compNetworkType])
+	chain, err := parseChain(m)
 
-	// TODO: Check coin type extraction from derivation path??? subnets???
-	if networkType == `` {
-		return nil, errors.New(`"networkType" required`)
-	}
-
-	ct := strings.TrimSpace(m[compCoinType])
-
-	// TODO: Check coin type extraction from derivation path??? subnets???
-	if ct == `` {
-		return nil, errors.New(`"ct" required`)
-	}
-
-	coinType, err := strconv.ParseUint(ct, 0, 32)
 	if err != nil {
-		return nil, errors.New(`cannot parse "ct"`)
-	}
-
-	// TODO: Add ci validation
-	if _, ok := m[compChainId]; !ok {
-		return nil, errors.New(`numeric "ci" required for "ct=evm"`)
+		return nil, err
 	}
 
 	mhda := &Address{
-		chain: &Chain{
-			networkType: NetworkType(networkType), // TODO: Add validation
-			coinType:    CoinType(coinType),
-			chainId:     ChainId(m[compChainId]),
-		},
+		chain: chain,
 	}
 
 	err = mhda.SetDerivationType(m[compDerivationType])
