@@ -13,11 +13,24 @@ const (
 	indexComponentIndex = 1
 	indexComponentValue = 2
 
-	compNetworkType      = `nt`
-	compDerivationType   = `dt`
-	compDerivationPath   = `dp`
-	compCoinType         = `ct`
-	compChainId          = `ci`
+	// NSS components
+
+	// Chain domain
+
+	// compNetworkType is Network Type description, e.g. "evm", "tvm", "avm", "btc", "cosmos"
+	compNetworkType = `nt`
+	// compCoinType is Coin Type description, according SLIP-44 list (https://github.com/satoshilabs/slips/blob/master/slip-0044.md)
+	// e.g. "0", "60", "195", "118"
+	compCoinType = `ct`
+	// compChainId is Network Id (Chain Id) description
+	// e.g  for evm hex: "0x1", "0x10", for Cosmos - string "axelar", etc
+	compChainId = `ci`
+
+	// Derivation path domain
+	compDerivationType = `dt`
+	compDerivationPath = `dp`
+
+	// Address format domain
 	compAddressAlgorithm = `aa`
 	compAddressFormat    = `ad`
 	compAddressPrefix    = `ap`
@@ -37,7 +50,7 @@ var (
 		compAddressSuffix,
 	}
 
-	rxComponent = regexp.MustCompile(`:(nt|dt|dp|ct|ci|aa|af|ap|as):([0-9a-z-._~*+=%$&@?'()!,;/#]+)`)
+	rxComponent = regexp.MustCompile(`:(nt|ct|ci|dt|dp|aa|af|ap|as):([0-9a-z-._~*+=%$&@?'()!,;/#]+)`)
 )
 
 // TODO: Match to RFC 8141
