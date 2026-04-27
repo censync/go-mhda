@@ -1,0 +1,2 @@
+go test fuzz v1
+string("urn:mhdA:nt:BtC:ct:0:ci:0 #")
