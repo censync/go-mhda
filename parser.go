@@ -1,7 +1,6 @@
 package go_mhda
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -9,21 +8,20 @@ import (
 
 const (
 	prefixMHDA          = `urn:mhda:`
-	prefixOffset        = 9
+	prefixOffset        = len(prefixMHDA)
 	indexComponentIndex = 1
 	indexComponentValue = 2
 
 	// NSS components
 
 	// Chain domain
-
 	// compNetworkType is Network Type description, e.g. "evm", "tvm", "avm", "btc", "cosmos"
 	compNetworkType = `nt`
-	// compCoinType is Coin Type description, according SLIP-44 list (https://github.com/satoshilabs/slips/blob/master/slip-0044.md)
-	// e.g. "0", "60", "195", "118"
+	// compCoinType is Coin Type description, according SLIP-44 list
+	// (https://github.com/satoshilabs/slips/blob/master/slip-0044.md), e.g. "0", "60", "195", "118".
 	compCoinType = `ct`
-	// compChainId is Network Id (Chain Id) description
-	// e.g  for evm hex: "0x1", "0x10", for Cosmos - string "axelar", etc
+	// compChainId is Network Id (Chain Id) description, e.g. for evm hex: "0x1", "0x10",
+	// for Cosmos - string "axelar", etc.
 	compChainId = `ci`
 
 	// Derivation path domain
@@ -32,18 +30,22 @@ const (
 
 	// Address format domain
 	compAddressAlgorithm = `aa`
-	compAddressFormat    = `ad`
+	compAddressFormat    = `af`
 	compAddressPrefix    = `ap`
 	compAddressSuffix    = `as`
 )
 
 var (
+	// componentsNames is the canonical emission order for NSS:
+	//   nt:ct:ci:dt:dp:aa:af:ap:as
+	// chain-domain (nt/ct/ci) first, then derivation, then address-format
+	// metadata.
 	componentsNames = []string{
 		compNetworkType,
-		compDerivationType,
-		compDerivationPath,
 		compCoinType,
 		compChainId,
+		compDerivationType,
+		compDerivationPath,
 		compAddressAlgorithm,
 		compAddressFormat,
 		compAddressPrefix,
@@ -53,21 +55,52 @@ var (
 	rxComponent = regexp.MustCompile(`:(nt|ct|ci|dt|dp|aa|af|ap|as):([0-9a-z-._~*+=%$&@?'()!,;/#]+)`)
 )
 
-// TODO: Match to RFC 8141
+// knownComponents is the lookup set for the split-based parser. Built from
+// componentsNames at init time.
+var knownComponents = func() map[string]struct{} {
+	m := make(map[string]struct{}, len(componentsNames))
+	for _, n := range componentsNames {
+		m[n] = struct{}{}
+	}
+	return m
+}()
 
+// hasPrefixFold reports whether s begins with prefix, ignoring ASCII case.
+// RFC 8141 §5.1: the leading "urn:" sequence and the NID are case-insensitive
+// (e.g. "URN:MHDA:..." must parse identically to "urn:mhda:...").
+func hasPrefixFold(s, prefix string) bool {
+	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
+}
+
+// stripRQF strips the optional rq-components ("?+" / "?=") and f-component
+// ("#") trailing the assigned-name part, per RFC 8141 §2. The current parser
+// does not interpret resource/query/fragment metadata; they are silently
+// discarded.
+func stripRQF(nss string) string {
+	if i := strings.IndexAny(nss, "?#"); i >= 0 {
+		return nss[:i]
+	}
+	return nss
+}
+
+// ParseURNRx parses a URN MHDA via a single regex pass. Behaviour matches
+// ParseURN; the regex variant exists primarily for benchmarking.
 func ParseURNRx(src string) (MHDA, error) {
-	if !strings.HasPrefix(src, prefixMHDA) {
-		return nil, errors.New("source string is not valid URN MHDA")
+	src = strings.TrimSpace(src)
+	if !hasPrefixFold(src, prefixMHDA) {
+		return nil, ErrInvalidURN
 	}
 
-	submatches := rxComponent.FindAllStringSubmatch(src[prefixOffset-1:], len(componentsNames))
+	nss := stripRQF(src[prefixOffset:])
+	// Re-prepend a leading colon so the regex's `:(component):` pattern
+	// can match the very first component.
+	submatches := rxComponent.FindAllStringSubmatch(":"+nss, len(componentsNames))
 
 	if len(submatches) == 0 {
-		return nil, errors.New("no components")
+		return nil, fmt.Errorf("%w: no components", ErrInvalidNSS)
 	}
 
 	components := map[string]string{}
-
 	for i := range submatches {
 		if len(submatches[i]) != 3 {
 			continue
@@ -75,85 +108,86 @@ func ParseURNRx(src string) (MHDA, error) {
 		components[submatches[i][indexComponentIndex]] = submatches[i][indexComponentValue]
 	}
 
-	//log.Println(components)
-
-	return nil, nil
-}
-func ParseURN(src string) (MHDA, error) {
-	if !strings.HasPrefix(src, prefixMHDA) {
-		return nil, errors.New("source string is not valid URN MHDA")
-	}
-
-	return ParseNSS(src[prefixOffset:])
-}
-
-func ParseNSS(src string) (MHDA, error) {
-	var componentsNamesTmp = make([]string, len(componentsNames))
-
-	copy(componentsNamesTmp, componentsNames)
-
-	components, err := parseNSS(src, componentsNamesTmp)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if _, ok := components[compNetworkType]; !ok {
-		return nil, errors.New(`"nt" not defined`)
-	}
-
 	return parseAddress(components)
 }
 
-func parseNSS(nss string, components []string) (map[string]string, error) {
-	result := map[string]string{}
+// ParseURN is the lenient parsing entry point. RFC 8141 §5.1 case-insensitive
+// prefix and §2 rq/f-components are accepted; surrounding whitespace is
+// trimmed.
+func ParseURN(src string) (MHDA, error) {
+	src = strings.TrimSpace(src)
+	if !hasPrefixFold(src, prefixMHDA) {
+		return nil, ErrInvalidURN
+	}
+	return ParseNSS(stripRQF(src[prefixOffset:]))
+}
 
-	iter := 0
-
-	for iter < len(nss) {
-		var isFound bool
-		for i := range components {
-			if nss[iter] == components[i][0] && nss[iter+1] == components[i][1] {
-				componentIndex := nss[iter : iter+2]
-				componentValue := ``
-				iterVal := iter + 3
-				for iterVal < len(nss) {
-					if nss[iterVal] == 58 { // 58 [:]  separator
-						break
-					}
-
-					// ASCII checks instead regexp for performance
-
-					if (nss[iterVal] >= 48 && nss[iterVal] <= 57) || // 48-57  [0-9]
-						(nss[iterVal] >= 97 && nss[iterVal] <= 122) || // 97-122 [a-z]
-						(nss[iterVal] >= 35 && nss[iterVal] <= 47) || // 35-47 [!#$%&'()*+,-./]
-						(nss[iterVal] >= 65 && nss[iterVal] <= 90) || // 65-90 [A-Z]
-						nss[iterVal] == 95 || // 95 [_]
-						nss[iterVal] == 33 || // 33 [!]
-						nss[iterVal] == 59 || // 59 [;]
-						nss[iterVal] == 61 || // 61 [=]
-						nss[iterVal] == 63 || // 63 [?]
-						nss[iterVal] == 64 { // 64 [@]
-
-						isFound = true
-						componentValue += nss[iterVal : iterVal+1]
-						iterVal++
-					} else {
-						return nil, fmt.Errorf("cannot parse nss: wrong symbol %q, pos %d", nss[iterVal], iterVal)
-					}
-
-				}
-				result[componentIndex] = componentValue
-				if isFound {
-					components = append(components[:i], components[i+1:]...)
-					iter = iterVal + 1
-					break
-				}
-			}
-		}
-		if !isFound {
-			iter += 3
+// ParseURNStrict is ParseURN + Validate(). It rejects URNs whose
+// (networkType, algorithm, format, derivation) combination is not in the
+// known-good compatibility matrix.
+func ParseURNStrict(src string) (MHDA, error) {
+	addr, err := ParseURN(src)
+	if err != nil {
+		return nil, err
+	}
+	if v, ok := addr.(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return nil, err
 		}
 	}
-	return result, nil
+	return addr, nil
+}
+
+// ParseNSS parses an MHDA namespace-specific string into an MHDA address.
+// Requires the network type ("nt") component to be present.
+func ParseNSS(nss string) (MHDA, error) {
+	components, err := parseNSS(nss)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := components[compNetworkType]; !ok {
+		return nil, ErrMissingNetworkType
+	}
+	return parseAddress(components)
+}
+
+// parseNSS is the shared low-level NSS parser. It returns the raw component
+// map; callers (ParseNSS, ChainFromNSS) interpret the map per their domain.
+//
+// Form: a sequence of `key:value` pairs joined by `:` separators. Unknown
+// keys are silently skipped (forward-compat with future URN extensions);
+// duplicate keys and empty values are rejected.
+//
+// Values may not contain ':'; this holds for every component currently
+// defined in MHDA. Adding a value type that needs ':' would require
+// percent-encoding support.
+func parseNSS(nss string) (map[string]string, error) {
+	parts := strings.Split(nss, ":")
+	components := make(map[string]string, len(componentsNames))
+
+	for i := 0; i < len(parts); {
+		key := parts[i]
+		if _, ok := knownComponents[key]; !ok {
+			// Unknown token (could be an unrelated word, a future component
+			// name, or part of a value we mis-identified). Skip and move on.
+			i++
+			continue
+		}
+		if i+1 >= len(parts) {
+			return nil, fmt.Errorf("%w: missing value for %q", ErrInvalidNSS, key)
+		}
+		// RFC 8141 NSS does not permit unescaped whitespace; trim it so any
+		// trailing space (e.g. from "ci:0 #frag" where stripRQF leaves the
+		// space) does not leak into the canonical form and break round-trip.
+		value := strings.TrimSpace(parts[i+1])
+		if value == "" {
+			return nil, fmt.Errorf("%w: empty value for %q", ErrInvalidNSS, key)
+		}
+		if _, dup := components[key]; dup {
+			return nil, fmt.Errorf("%w: duplicate component %q", ErrInvalidNSS, key)
+		}
+		components[key] = value
+		i += 2
+	}
+	return components, nil
 }

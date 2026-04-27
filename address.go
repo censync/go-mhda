@@ -1,5 +1,17 @@
 package go_mhda
 
+import (
+	"errors"
+	"strings"
+)
+
+// normalize trims surrounding whitespace and lowercases the input. Used
+// throughout the package to canonicalise component values (network type,
+// algorithm, format, derivation type) before lookup.
+func normalize(s string) string {
+	return strings.ToLower(strings.TrimSpace(s))
+}
+
 const (
 
 	// Derivation algorithms
@@ -14,14 +26,19 @@ const (
 
 	// Address formats
 
-	HEX    = Format(`hex`)
-	P2PKH  = Format(`p2pkh`)
-	P2S4   = Format(`p2s4`)
-	P2WPKH = Format(`p2wpkh`)
-	Bech32 = Format(`bech32`)
-	Base58 = Format(`base58`)
-
-	SS58 = Format(`ss58`)
+	HEX       = Format(`hex`)
+	P2PKH     = Format(`p2pkh`)     // Pay to Public Key Hash (legacy BTC)
+	P2SH      = Format(`p2sh`)      // Pay to Script Hash (nested SegWit BTC)
+	P2WPKH    = Format(`p2wpkh`)    // Pay to Witness Public Key Hash
+	P2WSH     = Format(`p2wsh`)     // Pay to Witness Script Hash
+	P2TR      = Format(`p2tr`)      // Pay to Taproot (BIP-341)
+	Bech32    = Format(`bech32`)    // BIP-173 (SegWit v0)
+	Bech32m   = Format(`bech32m`)   // BIP-350 (SegWit v1+, used by Taproot)
+	Base58    = Format(`base58`)    // Bitcoin alphabet base58check (BTC, XRP, TRX...)
+	Base32    = Format(`base32`)    // RFC 4648 base32 + 4-byte SHA512/256 checksum (Algorand)
+	StrKey    = Format(`strkey`)    // Stellar SEP-23: base32 of version || payload || CRC16
+	Base64URL = Format(`base64url`) // RFC 4648 base64url, used by TON user-friendly addresses
+	SS58      = Format(`ss58`)      // Substrate / Polkadot SS58
 )
 
 type Algorithm string
@@ -40,12 +57,50 @@ var (
 	}
 
 	indexFormats = map[Format]bool{
-		HEX:    true,
-		P2PKH:  true,
-		P2S4:   true,
-		P2WPKH: true,
-		Bech32: true,
-		Base58: true,
-		SS58:   true,
+		HEX:       true,
+		P2PKH:     true,
+		P2SH:      true,
+		P2WPKH:    true,
+		P2WSH:     true,
+		P2TR:      true,
+		Bech32:    true,
+		Bech32m:   true,
+		Base58:    true,
+		Base32:    true,
+		StrKey:    true,
+		Base64URL: true,
+		SS58:      true,
 	}
 )
+
+// IsValid reports whether the algorithm is one of the recognised constants.
+func (a Algorithm) IsValid() bool { return indexAlgorithms[a] }
+
+// String returns the algorithm as a plain string.
+func (a Algorithm) String() string { return string(a) }
+
+// AlgorithmFromString parses a string into an Algorithm. The lookup is
+// case-insensitive; surrounding whitespace is stripped.
+func AlgorithmFromString(src string) (Algorithm, error) {
+	a := Algorithm(normalize(src))
+	if !a.IsValid() {
+		return "", errors.New("undefined algorithm")
+	}
+	return a, nil
+}
+
+// IsValid reports whether the format is one of the recognised constants.
+func (f Format) IsValid() bool { return indexFormats[f] }
+
+// String returns the format as a plain string.
+func (f Format) String() string { return string(f) }
+
+// FormatFromString parses a string into a Format. The lookup is
+// case-insensitive; surrounding whitespace is stripped.
+func FormatFromString(src string) (Format, error) {
+	f := Format(normalize(src))
+	if !f.IsValid() {
+		return "", errors.New("undefined format")
+	}
+	return f, nil
+}
