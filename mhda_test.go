@@ -1612,6 +1612,32 @@ func TestRFC8141DropRQF(t *testing.T) {
 	}
 }
 
+// TestRegressionWhitespaceBeforeFragment is a fuzz-derived regression test.
+//
+// Originally found by FuzzParseURN as the seed
+// "urn:mhdA:nt:BtC:ct:0:ci:0 #": the trailing space inside the value, just
+// before the f-component delimiter '#', survived the first parse intact but
+// was stripped by the top-level TrimSpace on a second parse, breaking
+// idempotency (Parse(s).String() != Parse(Parse(s).String()).String()).
+// Fixed by trimming each NSS value at parse time. The case is asserted
+// explicitly here so the regression is guarded even without the fuzz seed
+// corpus on disk.
+func TestRegressionWhitespaceBeforeFragment(t *testing.T) {
+	in := "urn:mhdA:nt:BtC:ct:0:ci:0 #"
+	once, err := ParseURN(in)
+	if err != nil {
+		t.Fatalf("first parse: %v", err)
+	}
+	twice, err := ParseURN(once.String())
+	if err != nil {
+		t.Fatalf("second parse of %q: %v", once.String(), err)
+	}
+	if once.String() != twice.String() {
+		t.Errorf("not idempotent:\n once:  %q\n twice: %q\n input: %q",
+			once.String(), twice.String(), in)
+	}
+}
+
 // TestRFC8141ParseURNRx asserts the regex parser also honours RFC 8141
 // (was previously case-sensitive and lacked rq/f-component handling).
 func TestRFC8141ParseURNRx(t *testing.T) {
