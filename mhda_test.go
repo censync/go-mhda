@@ -9,15 +9,17 @@ import (
 
 var (
 	uriMHDA = []string{
-		`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44'/60'/1'/0/1:aa:secp256k1:af:hex:ap:0x`,
-		`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44'/60'/2'/0/2'`,
-		`urn:mhda:nt:evm:ct:60:ci:1`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin_testnet:dt:bip44:dp:m/44'/0'/0'/0/0`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip44:dp:m/44'/0'/1'/0/1:aa:secp256k1:af:p2pkh:ap:1`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip84:dp:m/84'/0'/2'/0/2`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m:ap:bc1p`,
-		`urn:mhda:nt:cosmos:ct:118:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/0/0`,
+		`urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44'/60'/1'/0/1:aa:secp256k1:af:hex:ap:0x`,
+		`urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/2'/0/2'`,
+		`urn:mhda:nt:evm:ci:1`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin_testnet:ct:0:dt:bip44:dp:m/44'/0'/0'/0/0`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip44:dp:m/44'/0'/1'/0/1:aa:secp256k1:af:p2pkh:ap:1`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip84:dp:m/84'/0'/2'/0/2`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m:ap:bc1p`,
+		`urn:mhda:nt:cosmos:ci:cosmoshub:ct:118:dt:cip11:dp:m/44'/118'/0'/0/0`,
+		`urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0:wt:web3:wi:5f2a8c31`,
+		`urn:mhda:nt:ton:ci:mainnet:wt:tonconnect:wi:c0a8f2d4-3b6e-4a51-9c7d-2f8e1a0b5c93`,
 	}
 )
 
@@ -81,16 +83,15 @@ func TestSentinelErrors(t *testing.T) {
 		urn  string
 		want error
 	}{
-		{`mhda:nt:evm:ct:60:ci:1`, ErrInvalidURN},
+		{`mhda:nt:evm:ci:1:ct:60`, ErrInvalidURN},
 		{`urn:mhda:ct:60:ci:1`, ErrMissingNetworkType},
-		{`urn:mhda:nt:notanetwork:ct:60:ci:1`, ErrInvalidNetworkType},
-		{`urn:mhda:nt:evm:ci:1`, ErrMissingCoinType},
-		{`urn:mhda:nt:evm:ct:notanumber:ci:1`, ErrInvalidCoinType},
+		{`urn:mhda:nt:notanetwork:ci:1:ct:60`, ErrInvalidNetworkType},
+		{`urn:mhda:nt:evm:ci:1:ct:notanumber`, ErrInvalidCoinType},
 		{`urn:mhda:nt:evm:ct:60`, ErrMissingChainID},
-		{`urn:mhda:nt:evm:ct:60:ci:1:dt:bipxx:dp:m/44'/60'/0'/0/0`, ErrInvalidDerivationType},
-		{`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:not_a_path`, ErrInvalidDerivationPath},
-		{`urn:mhda:nt:evm:ct:60:ci:1:aa:rsa`, ErrInvalidAlgorithm},
-		{`urn:mhda:nt:evm:ct:60:ci:1:af:notaformat`, ErrInvalidFormat},
+		{`urn:mhda:nt:evm:ci:1:ct:60:dt:bipxx:dp:m/44'/60'/0'/0/0`, ErrInvalidDerivationType},
+		{`urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:not_a_path`, ErrInvalidDerivationPath},
+		{`urn:mhda:nt:evm:ci:1:ct:60:aa:rsa`, ErrInvalidAlgorithm},
+		{`urn:mhda:nt:evm:ci:1:ct:60:af:notaformat`, ErrInvalidFormat},
 	}
 	for _, c := range cases {
 		_, err := ParseURN(c.urn)
@@ -133,20 +134,20 @@ func TestValidateCompatibility(t *testing.T) {
 	}
 	cases := []tc{
 		// valid combos
-		{`urn:mhda:nt:evm:ct:60:ci:1`, false},
-		{`urn:mhda:nt:evm:ct:60:ci:1:aa:secp256k1:af:hex`, false},
-		{`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2pkh`, false},
-		{`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32`, false},
-		{`urn:mhda:nt:sol:ct:501:ci:mainnet`, false},
-		{`urn:mhda:nt:sol:ct:501:ci:mainnet:aa:ed25519:af:base58`, false},
-		{`urn:mhda:nt:cosmos:ct:118:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/0/0`, false},
+		{`urn:mhda:nt:evm:ci:1:ct:60`, false},
+		{`urn:mhda:nt:evm:ci:1:ct:60:aa:secp256k1:af:hex`, false},
+		{`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2pkh`, false},
+		{`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32`, false},
+		{`urn:mhda:nt:solana:ci:mainnet:ct:501`, false},
+		{`urn:mhda:nt:solana:ci:mainnet:ct:501:aa:ed25519:af:base58`, false},
+		{`urn:mhda:nt:cosmos:ci:cosmoshub:ct:118:dt:cip11:dp:m/44'/118'/0'/0/0`, false},
 
 		// invalid combos
-		{`urn:mhda:nt:evm:ct:60:ci:1:aa:ed25519`, true},          // evm + ed25519
-		{`urn:mhda:nt:btc:ct:0:ci:bitcoin:aa:ed25519`, true},     // btc + ed25519
-		{`urn:mhda:nt:evm:ct:60:ci:1:af:bech32`, true},           // evm + bech32
-		{`urn:mhda:nt:sol:ct:501:ci:mainnet:aa:secp256k1`, true}, // sol + secp256k1
-		{`urn:mhda:nt:cosmos:ct:118:ci:cosmoshub:af:hex`, true},  // cosmos + hex
+		{`urn:mhda:nt:evm:ci:1:ct:60:aa:ed25519`, true},             // evm + ed25519
+		{`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:aa:ed25519`, true},    // btc + ed25519
+		{`urn:mhda:nt:evm:ci:1:ct:60:af:bech32`, true},              // evm + bech32
+		{`urn:mhda:nt:solana:ci:mainnet:ct:501:aa:secp256k1`, true}, // sol + secp256k1
+		{`urn:mhda:nt:cosmos:ci:cosmoshub:ct:118:af:hex`, true},     // cosmos + hex
 	}
 	for _, c := range cases {
 		_, err := ParseURNStrict(c.urn)
@@ -166,7 +167,7 @@ func TestValidateCompatibility(t *testing.T) {
 
 // TestStrictPreservesLenient ensures non-strict parse stays permissive.
 func TestStrictPreservesLenient(t *testing.T) {
-	bad := `urn:mhda:nt:evm:ct:60:ci:1:aa:ed25519`
+	bad := `urn:mhda:nt:evm:ci:1:ct:60:aa:ed25519`
 	if _, err := ParseURN(bad); err != nil {
 		t.Fatalf("non-strict parse should accept structurally valid URN, got %v", err)
 	}
@@ -178,13 +179,13 @@ func TestStrictPreservesLenient(t *testing.T) {
 // TestBitcoinFormats covers all Bitcoin script types under Strict mode.
 func TestBitcoinFormats(t *testing.T) {
 	for _, urn := range []string{
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2pkh`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2sh`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2wpkh`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2wsh`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:p2tr`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2pkh`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2sh`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2wpkh`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2wsh`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip86:dp:m/86'/0'/0'/0/0:af:p2tr`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -205,7 +206,7 @@ func TestLevels(t *testing.T) {
 	}
 	cases := []tc{
 		{
-			`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44'/60'/1'/0/2`,
+			`urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44'/60'/1'/0/2`,
 			[]AddressIndex{
 				{Index: 44, IsHardened: true},
 				{Index: 60, IsHardened: true},
@@ -215,7 +216,7 @@ func TestLevels(t *testing.T) {
 			},
 		},
 		{
-			`urn:mhda:nt:cosmos:ct:118:ci:cosmoshub:dt:cip11:dp:m/44'/118'/3'/0/7`,
+			`urn:mhda:nt:cosmos:ci:cosmoshub:ct:118:dt:cip11:dp:m/44'/118'/3'/0/7`,
 			[]AddressIndex{
 				{Index: 44, IsHardened: true},
 				{Index: 118, IsHardened: true},
@@ -250,48 +251,52 @@ func TestLevels(t *testing.T) {
 func TestREADMEExamples(t *testing.T) {
 	examples := []string{
 		// EVM
-		`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0`,
-		`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0:aa:secp256k1:af:hex:ap:0x`,
+		`urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0`,
+		`urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44'/60'/0'/0/0:aa:secp256k1:af:hex:ap:0x`,
 		// Bitcoin
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2pkh:ap:1`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip49:dp:m/49'/0'/0'/0/0:af:p2sh:ap:3`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32:ap:bc1q`,
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m:ap:bc1p`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2pkh:ap:1`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip49:dp:m/49'/0'/0'/0/0:af:p2sh:ap:3`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32:ap:bc1q`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m:ap:bc1p`,
 		// Avalanche
-		`urn:mhda:nt:evm:ct:60:ci:0xa86a:dt:bip44:dp:m/44'/60'/0'/0/0`,
-		`urn:mhda:nt:avm:ct:9000:ci:1:dt:bip44:dp:m/44'/9000'/0'/0/0:af:bech32:ap:X-avax`,
+		`urn:mhda:nt:evm:ci:0xa86a:dt:bip44:dp:m/44'/60'/0'/0/0`,
+		`urn:mhda:nt:avalanche:ci:1:ct:9000:dt:bip44:dp:m/44'/9000'/0'/0/0:af:bech32:ap:X-avax`,
 		// Solana
-		`urn:mhda:nt:sol:ct:501:ci:mainnet:dt:slip10:dp:m/44'/501'/0'/0'`,
-		// XRP
-		`urn:mhda:nt:xrp:ct:144:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0`,
-		`urn:mhda:nt:xrp:ct:144:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519`,
+		`urn:mhda:nt:solana:ci:mainnet:dt:slip10:dp:m/44'/501'/0'/0'`,
+		// XRP Ledger
+		`urn:mhda:nt:xrpl:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0`,
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519`,
 		// Stellar
-		`urn:mhda:nt:xlm:ct:148:ci:mainnet:dt:slip10:dp:m/44'/148'/0'`,
+		`urn:mhda:nt:stellar:ci:mainnet:dt:slip10:dp:m/44'/148'/0'`,
 		// NEAR
-		`urn:mhda:nt:near:ct:397:ci:mainnet:dt:slip10:dp:m/44'/397'/0'`,
-		`urn:mhda:nt:near:ct:397:ci:mainnet:dt:bip44:dp:m/44'/397'/0'/0/0:aa:secp256k1`,
+		`urn:mhda:nt:near:ci:mainnet:dt:slip10:dp:m/44'/397'/0'`,
+		`urn:mhda:nt:near:ci:mainnet:ct:397:dt:bip44:dp:m/44'/397'/0'/0/0:aa:secp256k1`,
 		// Aptos
-		`urn:mhda:nt:apt:ct:637:ci:mainnet:dt:slip10:dp:m/44'/637'/0'/0'/0'`,
-		`urn:mhda:nt:apt:ct:637:ci:mainnet:dt:bip44:dp:m/44'/637'/0'/0/0:aa:secp256k1`,
+		`urn:mhda:nt:aptos:ci:mainnet:dt:slip10:dp:m/44'/637'/0'/0'/0'`,
+		`urn:mhda:nt:aptos:ci:mainnet:ct:637:dt:bip44:dp:m/44'/637'/0'/0/0:aa:secp256k1`,
 		// Sui
-		`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:slip10:dp:m/44'/784'/0'/0'/0'`,
-		`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256k1`,
-		`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256r1`,
+		`urn:mhda:nt:sui:ci:mainnet:dt:slip10:dp:m/44'/784'/0'/0'/0'`,
+		`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256k1`,
+		`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256r1`,
 		// Cardano
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0`,
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/2/0`,
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0:af:base58`,
+		`urn:mhda:nt:cardano:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0`,
+		`urn:mhda:nt:cardano:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/2/0`,
+		`urn:mhda:nt:cardano:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0:af:base58`,
 		// Algorand
-		`urn:mhda:nt:algo:ct:283:ci:mainnet`,
-		`urn:mhda:nt:algo:ct:283:ci:mainnet:dt:slip10:dp:m/44'/283'/0'/0'/0'`,
+		`urn:mhda:nt:algorand:ci:mainnet`,
+		`urn:mhda:nt:algorand:ci:mainnet:ct:283:dt:slip10:dp:m/44'/283'/0'/0'/0'`,
 		// TON
-		`urn:mhda:nt:ton:ct:607:ci:mainnet`,
-		`urn:mhda:nt:ton:ct:607:ci:mainnet:af:hex`,
-		`urn:mhda:nt:ton:ct:607:ci:mainnet:dt:slip10:dp:m/44'/607'/0'`,
+		`urn:mhda:nt:ton:ci:mainnet`,
+		`urn:mhda:nt:ton:ci:mainnet:af:hex`,
+		`urn:mhda:nt:ton:ci:mainnet:ct:607:dt:slip10:dp:m/44'/607'/0'`,
 		// Cosmos
-		`urn:mhda:nt:cosmos:ct:118:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/0/0`,
-		// Root key
-		`urn:mhda:nt:evm:ct:60:ci:1`,
+		`urn:mhda:nt:cosmos:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/0/0`,
+		// Root key, with and without the optional SLIP-44 metadata
+		`urn:mhda:nt:evm:ci:1`,
+		`urn:mhda:nt:evm:ci:1:ct:60`,
+		// Wallet domain
+		`urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0:wt:web3:wi:5f2a8c31`,
+		`urn:mhda:nt:ton:ci:mainnet:wt:tonconnect:wi:c0a8f2d4-3b6e-4a51-9c7d-2f8e1a0b5c93`,
 	}
 	for _, urn := range examples {
 		addr, err := ParseURNStrict(urn)
@@ -312,13 +317,13 @@ func TestREADMEExamples(t *testing.T) {
 func TestTON(t *testing.T) {
 	for _, urn := range []string{
 		// Canonical native non-HD with friendly base64url default
-		`urn:mhda:nt:ton:ct:607:ci:mainnet`,
+		`urn:mhda:nt:ton:ci:mainnet:ct:607`,
 		// Long form
-		`urn:mhda:nt:ton:ct:607:ci:mainnet:aa:ed25519:af:base64url`,
+		`urn:mhda:nt:ton:ci:mainnet:ct:607:aa:ed25519:af:base64url`,
 		// Raw hex form (the protocol-internal canonical address representation)
-		`urn:mhda:nt:ton:ct:607:ci:mainnet:af:hex`,
+		`urn:mhda:nt:ton:ci:mainnet:ct:607:af:hex`,
 		// Ledger-style HD via SLIP-10
-		`urn:mhda:nt:ton:ct:607:ci:mainnet:dt:slip10:dp:m/44'/607'/0'`,
+		`urn:mhda:nt:ton:ci:mainnet:ct:607:dt:slip10:dp:m/44'/607'/0'`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -331,7 +336,7 @@ func TestTON(t *testing.T) {
 	}
 
 	// Defaults via the compatibility matrix.
-	addr, err := ParseURN(`urn:mhda:nt:ton:ct:607:ci:mainnet`)
+	addr, err := ParseURN(`urn:mhda:nt:ton:ci:mainnet:ct:607`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,12 +352,12 @@ func TestTON(t *testing.T) {
 func TestTONRejectsInvalidCombos(t *testing.T) {
 	for _, urn := range []string{
 		// TON is single-curve: ed25519 only
-		`urn:mhda:nt:ton:ct:607:ci:mainnet:aa:secp256k1`,
-		`urn:mhda:nt:ton:ct:607:ci:mainnet:aa:sr25519`,
+		`urn:mhda:nt:ton:ci:mainnet:ct:607:aa:secp256k1`,
+		`urn:mhda:nt:ton:ci:mainnet:ct:607:aa:sr25519`,
 		// Disallowed formats
-		`urn:mhda:nt:ton:ct:607:ci:mainnet:af:base58`,
-		`urn:mhda:nt:ton:ct:607:ci:mainnet:af:bech32`,
-		`urn:mhda:nt:ton:ct:607:ci:mainnet:af:strkey`,
+		`urn:mhda:nt:ton:ci:mainnet:ct:607:af:base58`,
+		`urn:mhda:nt:ton:ci:mainnet:ct:607:af:bech32`,
+		`urn:mhda:nt:ton:ci:mainnet:ct:607:af:strkey`,
 	} {
 		_, err := ParseURNStrict(urn)
 		if err == nil {
@@ -372,11 +377,11 @@ func TestTONRejectsInvalidCombos(t *testing.T) {
 func TestAlgorand(t *testing.T) {
 	for _, urn := range []string{
 		// Canonical non-HD: dt:root, no dp
-		`urn:mhda:nt:algo:ct:283:ci:mainnet`,
+		`urn:mhda:nt:algorand:ci:mainnet:ct:283`,
 		// With explicit defaults
-		`urn:mhda:nt:algo:ct:283:ci:mainnet:aa:ed25519:af:base32`,
+		`urn:mhda:nt:algorand:ci:mainnet:ct:283:aa:ed25519:af:base32`,
 		// Third-party SLIP-10 layered HD form
-		`urn:mhda:nt:algo:ct:283:ci:mainnet:dt:slip10:dp:m/44'/283'/0'/0'/0'`,
+		`urn:mhda:nt:algorand:ci:mainnet:ct:283:dt:slip10:dp:m/44'/283'/0'/0'/0'`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -389,7 +394,7 @@ func TestAlgorand(t *testing.T) {
 	}
 
 	// Defaults via the compatibility matrix.
-	addr, err := ParseURN(`urn:mhda:nt:algo:ct:283:ci:mainnet`)
+	addr, err := ParseURN(`urn:mhda:nt:algorand:ci:mainnet:ct:283`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,12 +410,12 @@ func TestAlgorand(t *testing.T) {
 func TestAlgorandRejectsInvalidCombos(t *testing.T) {
 	for _, urn := range []string{
 		// Algorand is single-curve: only ed25519
-		`urn:mhda:nt:algo:ct:283:ci:mainnet:aa:secp256k1`,
-		`urn:mhda:nt:algo:ct:283:ci:mainnet:aa:sr25519`,
+		`urn:mhda:nt:algorand:ci:mainnet:ct:283:aa:secp256k1`,
+		`urn:mhda:nt:algorand:ci:mainnet:ct:283:aa:sr25519`,
 		// Algorand uses base32 only
-		`urn:mhda:nt:algo:ct:283:ci:mainnet:af:hex`,
-		`urn:mhda:nt:algo:ct:283:ci:mainnet:af:base58`,
-		`urn:mhda:nt:algo:ct:283:ci:mainnet:af:bech32`,
+		`urn:mhda:nt:algorand:ci:mainnet:ct:283:af:hex`,
+		`urn:mhda:nt:algorand:ci:mainnet:ct:283:af:base58`,
+		`urn:mhda:nt:algorand:ci:mainnet:ct:283:af:bech32`,
 	} {
 		_, err := ParseURNStrict(urn)
 		if err == nil {
@@ -428,15 +433,15 @@ func TestAlgorandRejectsInvalidCombos(t *testing.T) {
 func TestCardano(t *testing.T) {
 	for _, urn := range []string{
 		// short form: defaults aa=ed25519, af=bech32 (Shelley)
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0`,
+		`urn:mhda:nt:cardano:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/0/0`,
 		// long form
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0:aa:ed25519:af:bech32`,
+		`urn:mhda:nt:cardano:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/0/0:aa:ed25519:af:bech32`,
 		// staking key (role=2 per CIP-1852)
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/2/0`,
+		`urn:mhda:nt:cardano:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/2/0`,
 		// internal change address (role=1)
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/1/3`,
+		`urn:mhda:nt:cardano:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/1/3`,
 		// Byron-era legacy address: base58 format still accepted
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0:af:base58`,
+		`urn:mhda:nt:cardano:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/0/0:af:base58`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -449,7 +454,7 @@ func TestCardano(t *testing.T) {
 	}
 
 	// Defaults via the compatibility matrix.
-	addr, err := ParseURN(`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0`)
+	addr, err := ParseURN(`urn:mhda:nt:cardano:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/0/0`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -465,10 +470,10 @@ func TestCardano(t *testing.T) {
 func TestCardanoRejectsInvalidCombos(t *testing.T) {
 	for _, urn := range []string{
 		// Cardano is single-curve: only ed25519 is allowed
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:aa:secp256k1`,
+		`urn:mhda:nt:cardano:ci:mainnet:ct:1815:aa:secp256k1`,
 		// hex / strkey are not Cardano formats
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:af:hex`,
-		`urn:mhda:nt:ada:ct:1815:ci:mainnet:af:strkey`,
+		`urn:mhda:nt:cardano:ci:mainnet:ct:1815:af:hex`,
+		`urn:mhda:nt:cardano:ci:mainnet:ct:1815:af:strkey`,
 	} {
 		_, err := ParseURNStrict(urn)
 		if err == nil {
@@ -487,11 +492,11 @@ func TestCardanoRejectsInvalidCombos(t *testing.T) {
 func TestSui(t *testing.T) {
 	for _, urn := range []string{
 		// ed25519 (default), all-hardened SLIP-10 form
-		`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:slip10:dp:m/44'/784'/0'/0'/0'`,
+		`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:slip10:dp:m/44'/784'/0'/0'/0'`,
 		// secp256k1 via BIP-54
-		`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256k1`,
+		`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256k1`,
 		// secp256r1 via BIP-74
-		`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256r1`,
+		`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256r1`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -504,7 +509,7 @@ func TestSui(t *testing.T) {
 	}
 
 	// Defaults via the compatibility matrix.
-	addr, err := ParseURN(`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:slip10:dp:m/44'/784'/0'/0'/0'`)
+	addr, err := ParseURN(`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:slip10:dp:m/44'/784'/0'/0'/0'`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -523,9 +528,9 @@ func TestSuiPurposeMapping(t *testing.T) {
 		urn         string
 		wantPurpose uint32
 	}{
-		{`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:slip10:dp:m/44'/784'/0'/0'/0'`, 44},
-		{`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256k1`, 54},
-		{`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256r1`, 74},
+		{`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:slip10:dp:m/44'/784'/0'/0'/0'`, 44},
+		{`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256k1`, 54},
+		{`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256r1`, 74},
 	}
 	for _, c := range cases {
 		addr, err := ParseURN(c.urn)
@@ -549,9 +554,9 @@ func TestSuiPurposeMapping(t *testing.T) {
 // TestSuiRejectsInvalidCombos covers strict-mode rejection.
 func TestSuiRejectsInvalidCombos(t *testing.T) {
 	for _, urn := range []string{
-		`urn:mhda:nt:sui:ct:784:ci:mainnet:aa:sr25519`, // wrong curve
-		`urn:mhda:nt:sui:ct:784:ci:mainnet:af:base58`,  // not Sui
-		`urn:mhda:nt:sui:ct:784:ci:mainnet:af:strkey`,  // not Sui
+		`urn:mhda:nt:sui:ci:mainnet:ct:784:aa:sr25519`, // wrong curve
+		`urn:mhda:nt:sui:ci:mainnet:ct:784:af:base58`,  // not Sui
+		`urn:mhda:nt:sui:ci:mainnet:ct:784:af:strkey`,  // not Sui
 	} {
 		_, err := ParseURNStrict(urn)
 		if err == nil {
@@ -570,11 +575,11 @@ func TestSuiRejectsInvalidCombos(t *testing.T) {
 func TestAptos(t *testing.T) {
 	for _, urn := range []string{
 		// ed25519 (default), all-hardened SLIP-10 form
-		`urn:mhda:nt:apt:ct:637:ci:mainnet:dt:slip10:dp:m/44'/637'/0'/0'/0'`,
+		`urn:mhda:nt:aptos:ci:mainnet:ct:637:dt:slip10:dp:m/44'/637'/0'/0'/0'`,
 		// long form
-		`urn:mhda:nt:apt:ct:637:ci:mainnet:dt:slip10:dp:m/44'/637'/0'/0'/0':aa:ed25519:af:hex`,
+		`urn:mhda:nt:aptos:ci:mainnet:ct:637:dt:slip10:dp:m/44'/637'/0'/0'/0':aa:ed25519:af:hex`,
 		// secp256k1 BIP-44 form
-		`urn:mhda:nt:apt:ct:637:ci:mainnet:dt:bip44:dp:m/44'/637'/0'/0/0:aa:secp256k1`,
+		`urn:mhda:nt:aptos:ci:mainnet:ct:637:dt:bip44:dp:m/44'/637'/0'/0/0:aa:secp256k1`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -587,7 +592,7 @@ func TestAptos(t *testing.T) {
 	}
 
 	// Defaults via the compatibility matrix.
-	addr, err := ParseURN(`urn:mhda:nt:apt:ct:637:ci:mainnet:dt:slip10:dp:m/44'/637'/0'/0'/0'`)
+	addr, err := ParseURN(`urn:mhda:nt:aptos:ci:mainnet:ct:637:dt:slip10:dp:m/44'/637'/0'/0'/0'`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -620,9 +625,9 @@ func TestAptos(t *testing.T) {
 // TestAptosRejectsInvalidCombos covers strict-mode rejection.
 func TestAptosRejectsInvalidCombos(t *testing.T) {
 	for _, urn := range []string{
-		`urn:mhda:nt:apt:ct:637:ci:mainnet:aa:sr25519`, // wrong curve
-		`urn:mhda:nt:apt:ct:637:ci:mainnet:af:base58`,  // not Aptos
-		`urn:mhda:nt:apt:ct:637:ci:mainnet:af:bech32`,  // not Aptos
+		`urn:mhda:nt:aptos:ci:mainnet:ct:637:aa:sr25519`, // wrong curve
+		`urn:mhda:nt:aptos:ci:mainnet:ct:637:af:base58`,  // not Aptos
+		`urn:mhda:nt:aptos:ci:mainnet:ct:637:af:bech32`,  // not Aptos
 	} {
 		_, err := ParseURNStrict(urn)
 		if err == nil {
@@ -641,11 +646,11 @@ func TestAptosRejectsInvalidCombos(t *testing.T) {
 func TestNEAR(t *testing.T) {
 	for _, urn := range []string{
 		// short form: defaults aa=ed25519, af=hex
-		`urn:mhda:nt:near:ct:397:ci:mainnet:dt:slip10:dp:m/44'/397'/0'`,
+		`urn:mhda:nt:near:ci:mainnet:ct:397:dt:slip10:dp:m/44'/397'/0'`,
 		// long form
-		`urn:mhda:nt:near:ct:397:ci:mainnet:dt:slip10:dp:m/44'/397'/0':aa:ed25519:af:hex`,
+		`urn:mhda:nt:near:ci:mainnet:ct:397:dt:slip10:dp:m/44'/397'/0':aa:ed25519:af:hex`,
 		// secp256k1 variant (ETH-implicit accounts)
-		`urn:mhda:nt:near:ct:397:ci:mainnet:dt:bip44:dp:m/44'/397'/0'/0/0:aa:secp256k1`,
+		`urn:mhda:nt:near:ci:mainnet:ct:397:dt:bip44:dp:m/44'/397'/0'/0/0:aa:secp256k1`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -658,7 +663,7 @@ func TestNEAR(t *testing.T) {
 	}
 
 	// Defaults via the compatibility matrix.
-	addr, err := ParseURN(`urn:mhda:nt:near:ct:397:ci:mainnet:dt:slip10:dp:m/44'/397'/0'`)
+	addr, err := ParseURN(`urn:mhda:nt:near:ci:mainnet:ct:397:dt:slip10:dp:m/44'/397'/0'`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -673,8 +678,8 @@ func TestNEAR(t *testing.T) {
 // TestNEARRejectsInvalidCombos covers strict-mode rejection.
 func TestNEARRejectsInvalidCombos(t *testing.T) {
 	for _, urn := range []string{
-		`urn:mhda:nt:near:ct:397:ci:mainnet:aa:sr25519`, // wrong curve
-		`urn:mhda:nt:near:ct:397:ci:mainnet:af:bech32`,  // NEAR has no bech32
+		`urn:mhda:nt:near:ci:mainnet:ct:397:aa:sr25519`, // wrong curve
+		`urn:mhda:nt:near:ci:mainnet:ct:397:af:bech32`,  // NEAR has no bech32
 	} {
 		_, err := ParseURNStrict(urn)
 		if err == nil {
@@ -693,11 +698,11 @@ func TestNEARRejectsInvalidCombos(t *testing.T) {
 func TestStellar(t *testing.T) {
 	for _, urn := range []string{
 		// short form: defaults aa=ed25519, af=strkey
-		`urn:mhda:nt:xlm:ct:148:ci:mainnet:dt:slip10:dp:m/44'/148'/0'`,
+		`urn:mhda:nt:stellar:ci:mainnet:ct:148:dt:slip10:dp:m/44'/148'/0'`,
 		// long form
-		`urn:mhda:nt:xlm:ct:148:ci:mainnet:dt:slip10:dp:m/44'/148'/0':aa:ed25519:af:strkey`,
+		`urn:mhda:nt:stellar:ci:mainnet:ct:148:dt:slip10:dp:m/44'/148'/0':aa:ed25519:af:strkey`,
 		// non-zero account from SEP-0005 vectors
-		`urn:mhda:nt:xlm:ct:148:ci:mainnet:dt:slip10:dp:m/44'/148'/3'`,
+		`urn:mhda:nt:stellar:ci:mainnet:ct:148:dt:slip10:dp:m/44'/148'/3'`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -710,7 +715,7 @@ func TestStellar(t *testing.T) {
 	}
 
 	// Defaults resolve via the compatibility matrix.
-	addr, err := ParseURN(`urn:mhda:nt:xlm:ct:148:ci:mainnet:dt:slip10:dp:m/44'/148'/0'`)
+	addr, err := ParseURN(`urn:mhda:nt:stellar:ci:mainnet:ct:148:dt:slip10:dp:m/44'/148'/0'`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -742,9 +747,9 @@ func TestStellar(t *testing.T) {
 // formats Stellar does not support.
 func TestStellarRejectsInvalidCombos(t *testing.T) {
 	for _, urn := range []string{
-		`urn:mhda:nt:xlm:ct:148:ci:mainnet:aa:secp256k1`, // wrong curve
-		`urn:mhda:nt:xlm:ct:148:ci:mainnet:af:bech32`,    // wrong format
-		`urn:mhda:nt:xlm:ct:148:ci:mainnet:af:base58`,    // also rejected
+		`urn:mhda:nt:stellar:ci:mainnet:ct:148:aa:secp256k1`, // wrong curve
+		`urn:mhda:nt:stellar:ci:mainnet:ct:148:af:bech32`,    // wrong format
+		`urn:mhda:nt:stellar:ci:mainnet:ct:148:af:base58`,    // also rejected
 	} {
 		_, err := ParseURNStrict(urn)
 		if err == nil {
@@ -763,11 +768,11 @@ func TestStellarRejectsInvalidCombos(t *testing.T) {
 func TestXRP(t *testing.T) {
 	for _, urn := range []string{
 		// short form: defaults aa=secp256k1, af=base58 must NOT leak into NSS
-		`urn:mhda:nt:xrp:ct:144:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0`,
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0`,
 		// long form with explicit defaults
-		`urn:mhda:nt:xrp:ct:144:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0:aa:secp256k1:af:base58`,
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:secp256k1:af:base58`,
 		// ed25519 variant (XLS-10 / XUMM-style)
-		`urn:mhda:nt:xrp:ct:144:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519:af:base58`,
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519:af:base58`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -780,7 +785,7 @@ func TestXRP(t *testing.T) {
 	}
 
 	// Defaults resolve correctly via the network-compatibility matrix.
-	addr, err := ParseURN(`urn:mhda:nt:xrp:ct:144:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0`)
+	addr, err := ParseURN(`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -796,8 +801,8 @@ func TestXRP(t *testing.T) {
 // combinations (e.g. format hex - XRPL has no hex address form).
 func TestXRPRejectsInvalidCombos(t *testing.T) {
 	bad := []string{
-		`urn:mhda:nt:xrp:ct:144:ci:mainnet:aa:sr25519`, // unsupported algo
-		`urn:mhda:nt:xrp:ct:144:ci:mainnet:af:hex`,     // unsupported format
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:aa:sr25519`, // unsupported algo
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:af:hex`,     // unsupported format
 	}
 	for _, urn := range bad {
 		_, err := ParseURNStrict(urn)
@@ -816,9 +821,9 @@ func TestXRPRejectsInvalidCombos(t *testing.T) {
 // which format) is Phase C work.
 func TestNewFormats(t *testing.T) {
 	for _, urn := range []string{
-		`urn:mhda:nt:evm:ct:283:ci:mainnet:af:base32`,
-		`urn:mhda:nt:evm:ct:148:ci:mainnet:af:strkey`,
-		`urn:mhda:nt:evm:ct:607:ci:mainnet:af:base64url`,
+		`urn:mhda:nt:evm:ci:mainnet:ct:283:af:base32`,
+		`urn:mhda:nt:evm:ci:mainnet:ct:148:af:strkey`,
+		`urn:mhda:nt:evm:ci:mainnet:ct:607:af:base64url`,
 	} {
 		addr, err := ParseURN(urn)
 		if err != nil {
@@ -840,15 +845,15 @@ func TestCIP1852(t *testing.T) {
 		wantRole ChargeType
 	}{
 		// role 0 = external (payment key)
-		{`urn:mhda:nt:evm:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0`, 0},
+		{`urn:mhda:nt:evm:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/0/0`, 0},
 		// role 1 = internal (change)
-		{`urn:mhda:nt:evm:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/1/0`, 1},
+		{`urn:mhda:nt:evm:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/1/0`, 1},
 		// role 2 = staking key
-		{`urn:mhda:nt:evm:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/2/0`, 2},
+		{`urn:mhda:nt:evm:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/2/0`, 2},
 		// role 3 = DRep (CIP-105)
-		{`urn:mhda:nt:evm:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/3/0`, 3},
+		{`urn:mhda:nt:evm:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/3/0`, 3},
 		// hardened address index
-		{`urn:mhda:nt:evm:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/3'/2/7'`, 2},
+		{`urn:mhda:nt:evm:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/3'/2/7'`, 2},
 	}
 	for _, c := range cases {
 		addr, err := ParseURN(c.urn)
@@ -868,7 +873,7 @@ func TestCIP1852(t *testing.T) {
 // TestCIP1852Levels verifies the canonical levels[] view exposes the fixed
 // purpose=1852' and coin=1815' from the spec.
 func TestCIP1852Levels(t *testing.T) {
-	addr, err := ParseURN(`urn:mhda:nt:evm:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/3'/2/7`)
+	addr, err := ParseURN(`urn:mhda:nt:evm:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/3'/2/7`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -900,7 +905,7 @@ func TestSLIP10(t *testing.T) {
 	}{
 		{
 			// Solana: m/44'/501'/account'/change'
-			`urn:mhda:nt:sol:ct:501:ci:mainnet:dt:slip10:dp:m/44'/501'/0'/0'`,
+			`urn:mhda:nt:solana:ci:mainnet:ct:501:dt:slip10:dp:m/44'/501'/0'/0'`,
 			[]AddressIndex{
 				{Index: 44, IsHardened: true},
 				{Index: 501, IsHardened: true},
@@ -910,7 +915,7 @@ func TestSLIP10(t *testing.T) {
 		},
 		{
 			// Stellar SEP-0005: m/44'/148'/account'
-			`urn:mhda:nt:evm:ct:148:ci:mainnet:dt:slip10:dp:m/44'/148'/0'`,
+			`urn:mhda:nt:evm:ci:mainnet:ct:148:dt:slip10:dp:m/44'/148'/0'`,
 			[]AddressIndex{
 				{Index: 44, IsHardened: true},
 				{Index: 148, IsHardened: true},
@@ -919,7 +924,7 @@ func TestSLIP10(t *testing.T) {
 		},
 		{
 			// Sui ed25519: m/44'/784'/account'/change'/index'
-			`urn:mhda:nt:evm:ct:784:ci:mainnet:dt:slip10:dp:m/44'/784'/0'/0'/0'`,
+			`urn:mhda:nt:evm:ci:mainnet:ct:784:dt:slip10:dp:m/44'/784'/0'/0'/0'`,
 			[]AddressIndex{
 				{Index: 44, IsHardened: true},
 				{Index: 784, IsHardened: true},
@@ -930,7 +935,7 @@ func TestSLIP10(t *testing.T) {
 		},
 		{
 			// Aptos: m/44'/637'/account'/change'/index'
-			`urn:mhda:nt:evm:ct:637:ci:mainnet:dt:slip10:dp:m/44'/637'/0'/0'/0'`,
+			`urn:mhda:nt:evm:ci:mainnet:ct:637:dt:slip10:dp:m/44'/637'/0'/0'/0'`,
 			nil, // checked via round-trip only
 		},
 	}
@@ -962,7 +967,7 @@ func TestSLIP10(t *testing.T) {
 // but the parser must accept the structure - semantic validation is for the
 // caller.
 func TestSLIP10MixedHardening(t *testing.T) {
-	urn := `urn:mhda:nt:evm:ct:0:ci:mainnet:dt:slip10:dp:m/44'/0'/0'/0/5`
+	urn := `urn:mhda:nt:evm:ci:mainnet:ct:0:dt:slip10:dp:m/44'/0'/0'/0/5`
 	addr, err := ParseURN(urn)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -1005,9 +1010,9 @@ func TestNewDerivationPathFromLevels(t *testing.T) {
 // index) ZIP-32 forms; both must round-trip.
 func TestZIP32VariableLength(t *testing.T) {
 	for _, urn := range []string{
-		`urn:mhda:nt:btc:ct:133:ci:zcash:dt:zip32:dp:m/32'/133'/0'`,
-		`urn:mhda:nt:btc:ct:133:ci:zcash:dt:zip32:dp:m/32'/133'/0'/0`,
-		`urn:mhda:nt:btc:ct:133:ci:zcash:dt:zip32:dp:m/32'/133'/0'/0'`,
+		`urn:mhda:nt:bitcoin:ci:zcash:ct:133:dt:zip32:dp:m/32'/133'/0'`,
+		`urn:mhda:nt:bitcoin:ci:zcash:ct:133:dt:zip32:dp:m/32'/133'/0'/0`,
+		`urn:mhda:nt:bitcoin:ci:zcash:ct:133:dt:zip32:dp:m/32'/133'/0'/0'`,
 	} {
 		addr, err := ParseURN(urn)
 		if err != nil {
@@ -1026,11 +1031,11 @@ func TestZIP32VariableLength(t *testing.T) {
 // secp256k1/secp256r1 schemes per the sui-keys source.
 func TestBIP44Family(t *testing.T) {
 	for _, urn := range []string{
-		`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip49:dp:m/49'/0'/0'/0/0:af:p2sh`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip49:dp:m/49'/0'/0'/0/0:af:p2sh`,
 		// sui not yet registered as network type; use evm as a syntactic stand-in
 		// for path parsing - Phase C will add proper Sui entries.
-		`urn:mhda:nt:evm:ct:784:ci:1:dt:bip54:dp:m/54'/784'/0'/0/0`,
-		`urn:mhda:nt:evm:ct:784:ci:1:dt:bip74:dp:m/74'/784'/0'/0/0`,
+		`urn:mhda:nt:evm:ci:1:ct:784:dt:bip54:dp:m/54'/784'/0'/0/0`,
+		`urn:mhda:nt:evm:ci:1:ct:784:dt:bip74:dp:m/74'/784'/0'/0/0`,
 	} {
 		addr, err := ParseURN(urn)
 		if err != nil {
@@ -1046,7 +1051,7 @@ func TestBIP44Family(t *testing.T) {
 // TestCIP11Coin verifies that CIP-11 paths serialize with coin 118 (Cosmos),
 // not 133 (Zcash) as the previous String() formatter incorrectly hardcoded.
 func TestCIP11Coin(t *testing.T) {
-	in := `urn:mhda:nt:cosmos:ct:118:ci:cosmoshub:dt:cip11:dp:m/44'/118'/3'/0/7`
+	in := `urn:mhda:nt:cosmos:ci:cosmoshub:ct:118:dt:cip11:dp:m/44'/118'/3'/0/7`
 	addr, err := ParseURN(in)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
@@ -1059,14 +1064,14 @@ func TestCIP11Coin(t *testing.T) {
 // TestFormatLazyDefault checks the lazy default for Format() and that NSS()
 // does not emit the defaulted value (only explicit values are serialized).
 func TestFormatLazyDefault(t *testing.T) {
-	addr, err := ParseURN(`urn:mhda:nt:evm:ct:60:ci:1`)
+	addr, err := ParseURN(`urn:mhda:nt:evm:ci:1:ct:60`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if addr.Format() != HEX {
 		t.Errorf("Format() default for evm = %q, want %q", addr.Format(), HEX)
 	}
-	if want := `urn:mhda:nt:evm:ct:60:ci:1`; addr.String() != want {
+	if want := `urn:mhda:nt:evm:ci:1:ct:60`; addr.String() != want {
 		t.Errorf("String() = %q, want %q (defaults must not leak into serialization)", addr.String(), want)
 	}
 }
@@ -1078,9 +1083,9 @@ func TestAlgorithmDefaults(t *testing.T) {
 		urn  string
 		want Algorithm
 	}{
-		{`urn:mhda:nt:evm:ct:60:ci:1`, Secp256k1},
-		{`urn:mhda:nt:sol:ct:501:ci:mainnet`, Ed25519},
-		{`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip44:dp:m/44'/0'/1'/0/1:aa:secp256k1:af:p2pkh:ap:1`, Secp256k1},
+		{`urn:mhda:nt:evm:ci:1:ct:60`, Secp256k1},
+		{`urn:mhda:nt:solana:ci:mainnet:ct:501`, Ed25519},
+		{`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip44:dp:m/44'/0'/1'/0/1:aa:secp256k1:af:p2pkh:ap:1`, Secp256k1},
 	}
 	for _, c := range cases {
 		addr, err := ParseURN(c.urn)
@@ -1099,12 +1104,6 @@ func BenchmarkParse(b *testing.B) {
 	}
 }
 
-func BenchmarkParseRx(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		ParseURNRx(uriMHDA[0])
-	}
-}
-
 // ----------------------------------------------------------------------------
 // Audit-driven regression tests
 // ----------------------------------------------------------------------------
@@ -1114,7 +1113,7 @@ func BenchmarkParseRx(b *testing.B) {
 // getters had pointer receivers since Address.Chain() returns a non-
 // addressable value.
 func TestChainGettersChainable(t *testing.T) {
-	addr, err := ParseURN(`urn:mhda:nt:evm:ct:60:ci:1`)
+	addr, err := ParseURN(`urn:mhda:nt:evm:ci:1:ct:60`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1124,11 +1123,15 @@ func TestChainGettersChainable(t *testing.T) {
 	if got := addr.Chain().CoinType(); got != ETH {
 		t.Errorf("CoinType() = %d, want %d", got, ETH)
 	}
+	if !addr.Chain().HasCoinType() {
+		t.Error("HasCoinType() = false, want true (ct was set in the URN)")
+	}
 	if got := addr.Chain().ChainId(); got != "1" {
 		t.Errorf("ChainId() = %q, want %q", got, "1")
 	}
-	// Key() is computed from String(); make sure it works inline too.
-	want := "nt:evm:ct:60:ci:1"
+	// Key() is computed from String(); make sure it works inline too. The
+	// coin-type metadata is excluded from the chain key.
+	want := "nt:evm:ci:1"
 	if got := string(addr.Chain().Key()); got != want {
 		t.Errorf("Key() = %q, want %q", got, want)
 	}
@@ -1137,7 +1140,7 @@ func TestChainGettersChainable(t *testing.T) {
 // TestChainSettersMutate verifies SetX persistently mutate the chain. Was
 // broken when setters had value receivers (silent no-op).
 func TestChainSettersMutate(t *testing.T) {
-	c := NewChain(EthereumVM, ETH, "1")
+	c := NewChain(EthereumVM, "1")
 	c.SetNetworkType(Bitcoin)
 	c.SetCoinType(BTC)
 	c.SetChainId("bitcoin")
@@ -1145,12 +1148,19 @@ func TestChainSettersMutate(t *testing.T) {
 		t.Errorf("setters did not persist: nt=%q ct=%d ci=%q",
 			c.NetworkType(), c.CoinType(), c.ChainId())
 	}
+	if !c.HasCoinType() {
+		t.Error("HasCoinType() = false after SetCoinType")
+	}
+	c.ClearCoinType()
+	if c.HasCoinType() || c.CoinType() != 0 {
+		t.Errorf("ClearCoinType did not reset: has=%v ct=%d", c.HasCoinType(), c.CoinType())
+	}
 }
 
 // TestSetPrefixSuffixReset ensures empty-string SetX resets the field, matching
 // the semantics of SetAddressAlgorithm/Format.
 func TestSetPrefixSuffixReset(t *testing.T) {
-	addr := NewAddress(NewChain(EthereumVM, ETH, "1"), nil, "", "", "0xPREFIX", "SUFFIX")
+	addr := NewAddress(NewChain(EthereumVM, "1"), nil, "", "", "0xPREFIX", "SUFFIX")
 	if !strings.Contains(addr.String(), ":ap:0xPREFIX") {
 		t.Fatalf("expected prefix in URN, got %q", addr.String())
 	}
@@ -1163,8 +1173,8 @@ func TestSetPrefixSuffixReset(t *testing.T) {
 	if err := addr.SetAddressSuffix(""); err != nil {
 		t.Fatal(err)
 	}
-	if got := addr.String(); got != `urn:mhda:nt:evm:ct:60:ci:1` {
-		t.Errorf("after reset: got %q, want %q", got, `urn:mhda:nt:evm:ct:60:ci:1`)
+	if got := addr.String(); got != `urn:mhda:nt:evm:ci:1` {
+		t.Errorf("after reset: got %q, want %q", got, `urn:mhda:nt:evm:ci:1`)
 	}
 }
 
@@ -1254,8 +1264,8 @@ func TestEmptyComponentValuesRejected(t *testing.T) {
 // canonicalize to ' on output.
 func TestHardenedMarkerNormalization(t *testing.T) {
 	cases := map[string]string{
-		`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44H/60H/0H/0/0`: `urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0`,
-		`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44h/60h/0h/0/0`: `urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0`,
+		`urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44H/60H/0H/0/0`: `urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44'/60'/0'/0/0`,
+		`urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44h/60h/0h/0/0`: `urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44'/60'/0'/0/0`,
 	}
 	for in, want := range cases {
 		addr, err := ParseURN(in)
@@ -1272,7 +1282,7 @@ func TestHardenedMarkerNormalization(t *testing.T) {
 // TestDerivationTypeAccessor verifies the new public method on Address and
 // the MHDA interface.
 func TestDerivationTypeAccessor(t *testing.T) {
-	addr, err := ParseURN(`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0`)
+	addr, err := ParseURN(`urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44'/60'/0'/0/0`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1280,7 +1290,7 @@ func TestDerivationTypeAccessor(t *testing.T) {
 		t.Errorf("DerivationType() = %q, want %q", got, BIP44)
 	}
 	// ROOT path
-	root, err := ParseURN(`urn:mhda:nt:evm:ct:60:ci:1`)
+	root, err := ParseURN(`urn:mhda:nt:evm:ci:1:ct:60`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1315,7 +1325,7 @@ func TestUnmarshalTextInvalid(t *testing.T) {
 	if err := a.UnmarshalText([]byte("not-a-urn")); !errors.Is(err, ErrInvalidURN) {
 		t.Errorf("bad input: got %v, want ErrInvalidURN", err)
 	}
-	if err := a.UnmarshalText([]byte("urn:mhda:nt:evm:ct:60:ci:1")); err != nil {
+	if err := a.UnmarshalText([]byte("urn:mhda:nt:evm:ci:1:ct:60")); err != nil {
 		t.Errorf("good input rejected: %v", err)
 	}
 }
@@ -1382,7 +1392,7 @@ func TestParseDerivationPathErrors(t *testing.T) {
 // (e.g. ErrInvalidDerivationPath wraps numeric-overflow errors so callers
 // can errors.Is on a single value).
 func TestSetDerivationPathSentinelChain(t *testing.T) {
-	_, err := ParseURN(`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44'/0'/0'/0/99999999999999999999`)
+	_, err := ParseURN(`urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44'/0'/0'/0/99999999999999999999`)
 	if err == nil {
 		t.Fatal("expected error for overflowing index")
 	}
@@ -1399,8 +1409,12 @@ func TestNetworkTypeFromString(t *testing.T) {
 		want NetworkType
 		err  bool
 	}{
-		{"xrp", XRPLedger, false},
-		{"  XRP  ", XRPLedger, false}, // case + whitespace tolerance
+		{"xrpl", XRPLedger, false},
+		{"  XRPL  ", XRPLedger, false}, // case + whitespace tolerance
+		{"solana", Solana, false},
+		{"bitcoin", Bitcoin, false},
+		{"sol", "", true}, // pre-1.1 short names are gone
+		{"btc", "", true},
 		{"xxx", "", true},
 	}
 	for _, c := range cases {
@@ -1484,18 +1498,23 @@ func TestDerivationTypeHelpers(t *testing.T) {
 	}
 }
 
-// TestChainStringFormat closes the loop on a previously broken Chain.String()
-// that emitted networkType twice instead of (networkType, coinType). The
-// canonical form uses ':' separators throughout so it is itself a valid NSS
-// key consumable by ChainFromKey / ChainFromNSS.
+// TestChainStringFormat pins the canonical chain-key form. The key is the
+// chain identity (networkType, chainId) only; the optional coin-type metadata
+// never leaks into it. The canonical form uses ':' separators throughout so
+// it is itself a valid NSS key consumable by ChainFromKey / ChainFromNSS.
 func TestChainStringFormat(t *testing.T) {
-	c := NewChain(EthereumVM, ETH, "0x1")
-	want := "nt:evm:ct:60:ci:0x1"
+	c := NewChain(EthereumVM, "0x1")
+	want := "nt:evm:ci:0x1"
 	if got := c.String(); got != want {
 		t.Errorf("String() = %q, want %q", got, want)
 	}
 	if got := string(c.Key()); got != want {
 		t.Errorf("Key() = %q, want %q", got, want)
+	}
+	// Attaching coin-type metadata must not change the key.
+	c.SetCoinType(ETH)
+	if got := c.String(); got != want {
+		t.Errorf("String() after SetCoinType = %q, want %q", got, want)
 	}
 }
 
@@ -1522,31 +1541,31 @@ func TestDerivationCompatibility(t *testing.T) {
 	}
 	cases := []tc{
 		// allowed combos
-		{`urn:mhda:nt:evm:ct:60:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0`, nil},
-		{`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m`, nil},
-		{`urn:mhda:nt:cosmos:ct:118:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/0/0`, nil},
-		{`urn:mhda:nt:sol:ct:501:ci:mainnet:dt:slip10:dp:m/44'/501'/0'/0'`, nil},
-		{`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0`, nil},
+		{`urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44'/60'/0'/0/0`, nil},
+		{`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m`, nil},
+		{`urn:mhda:nt:cosmos:ci:cosmoshub:ct:118:dt:cip11:dp:m/44'/118'/0'/0/0`, nil},
+		{`urn:mhda:nt:solana:ci:mainnet:ct:501:dt:slip10:dp:m/44'/501'/0'/0'`, nil},
+		{`urn:mhda:nt:cardano:ci:mainnet:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/0/0`, nil},
 		// ROOT is always permitted (non-HD form)
-		{`urn:mhda:nt:algo:ct:283:ci:mainnet`, nil},
-		{`urn:mhda:nt:ton:ct:607:ci:mainnet`, nil},
+		{`urn:mhda:nt:algorand:ci:mainnet:ct:283`, nil},
+		{`urn:mhda:nt:ton:ci:mainnet:ct:607`, nil},
 		// Sui's purpose-variant schemes
-		{`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256k1`, nil},
-		{`urn:mhda:nt:sui:ct:784:ci:mainnet:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256r1`, nil},
+		{`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256k1`, nil},
+		{`urn:mhda:nt:sui:ci:mainnet:ct:784:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256r1`, nil},
 
 		// disallowed combos (network has no business with this derivation)
 		// EVM does not use cip1852
-		{`urn:mhda:nt:evm:ct:1815:ci:1:dt:cip1852:dp:m/1852'/1815'/0'/0/0`, ErrIncompatible},
+		{`urn:mhda:nt:evm:ci:1:ct:1815:dt:cip1852:dp:m/1852'/1815'/0'/0/0`, ErrIncompatible},
 		// Solana uses slip10 only, not bip44
-		{`urn:mhda:nt:sol:ct:501:ci:mainnet:dt:bip44:dp:m/44'/501'/0'/0/0`, ErrIncompatible},
+		{`urn:mhda:nt:solana:ci:mainnet:ct:501:dt:bip44:dp:m/44'/501'/0'/0/0`, ErrIncompatible},
 		// Cardano uses cip1852 only, not bip44
-		{`urn:mhda:nt:ada:ct:1815:ci:mainnet:dt:bip44:dp:m/44'/1815'/0'/0/0`, ErrIncompatible},
+		{`urn:mhda:nt:cardano:ci:mainnet:ct:1815:dt:bip44:dp:m/44'/1815'/0'/0/0`, ErrIncompatible},
 		// Bitcoin does not use cip11 (Cosmos-specific)
-		{`urn:mhda:nt:btc:ct:0:ci:bitcoin:dt:cip11:dp:m/44'/118'/0'/0/0`, ErrIncompatible},
+		{`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:cip11:dp:m/44'/118'/0'/0/0`, ErrIncompatible},
 		// Sui's purpose-54 path makes no sense on Aptos
-		{`urn:mhda:nt:apt:ct:637:ci:mainnet:dt:bip54:dp:m/54'/637'/0'/0/0:aa:secp256k1`, ErrIncompatible},
+		{`urn:mhda:nt:aptos:ci:mainnet:ct:637:dt:bip54:dp:m/54'/637'/0'/0/0:aa:secp256k1`, ErrIncompatible},
 		// Stellar is slip10-only
-		{`urn:mhda:nt:xlm:ct:148:ci:mainnet:dt:bip44:dp:m/44'/148'/0'/0/0`, ErrIncompatible},
+		{`urn:mhda:nt:stellar:ci:mainnet:ct:148:dt:bip44:dp:m/44'/148'/0'/0/0`, ErrIncompatible},
 	}
 	for _, c := range cases {
 		_, err := ParseURNStrict(c.urn)
@@ -1570,14 +1589,14 @@ func TestDerivationCompatibility(t *testing.T) {
 // NID "mhda" are accepted in any ASCII case combination, per RFC 8141 §5.1.
 // The canonical output remains lowercase.
 func TestRFC8141CaseInsensitivePrefix(t *testing.T) {
-	canonical := `urn:mhda:nt:evm:ct:60:ci:1`
+	canonical := `urn:mhda:nt:evm:ci:1:ct:60`
 	for _, in := range []string{
-		`urn:mhda:nt:evm:ct:60:ci:1`, // baseline
-		`URN:MHDA:nt:evm:ct:60:ci:1`,
-		`Urn:Mhda:nt:evm:ct:60:ci:1`,
-		`URN:mhda:nt:evm:ct:60:ci:1`,
-		`urn:MHDA:nt:evm:ct:60:ci:1`,
-		`  urn:mhda:nt:evm:ct:60:ci:1  `, // surrounding whitespace
+		`urn:mhda:nt:evm:ci:1:ct:60`, // baseline
+		`URN:MHDA:nt:evm:ci:1:ct:60`,
+		`Urn:Mhda:nt:evm:ci:1:ct:60`,
+		`URN:mhda:nt:evm:ci:1:ct:60`,
+		`urn:MHDA:nt:evm:ci:1:ct:60`,
+		`  urn:mhda:nt:evm:ci:1:ct:60  `, // surrounding whitespace
 	} {
 		addr, err := ParseURN(in)
 		if err != nil {
@@ -1594,12 +1613,12 @@ func TestRFC8141CaseInsensitivePrefix(t *testing.T) {
 // f-component (# fragment) are stripped before parsing the NSS. RFC 8141
 // allows them syntactically; this library does not interpret them.
 func TestRFC8141DropRQF(t *testing.T) {
-	canonical := `urn:mhda:nt:evm:ct:60:ci:1`
+	canonical := `urn:mhda:nt:evm:ci:1:ct:60`
 	for _, in := range []string{
-		`urn:mhda:nt:evm:ct:60:ci:1?+resolver=example.com`,
-		`urn:mhda:nt:evm:ct:60:ci:1?=v=1`,
-		`urn:mhda:nt:evm:ct:60:ci:1#fragment`,
-		`urn:mhda:nt:evm:ct:60:ci:1?+a=b#frag`,
+		`urn:mhda:nt:evm:ci:1:ct:60?+resolver=example.com`,
+		`urn:mhda:nt:evm:ci:1:ct:60?=v=1`,
+		`urn:mhda:nt:evm:ci:1:ct:60#fragment`,
+		`urn:mhda:nt:evm:ci:1:ct:60?+a=b#frag`,
 	} {
 		addr, err := ParseURN(in)
 		if err != nil {
@@ -1623,7 +1642,7 @@ func TestRFC8141DropRQF(t *testing.T) {
 // explicitly here so the regression is guarded even without the fuzz seed
 // corpus on disk.
 func TestRegressionWhitespaceBeforeFragment(t *testing.T) {
-	in := "urn:mhdA:nt:BtC:ct:0:ci:0 #"
+	in := "urn:mhdA:nt:BitCoin:ct:0:ci:0 #"
 	once, err := ParseURN(in)
 	if err != nil {
 		t.Fatalf("first parse: %v", err)
@@ -1638,28 +1657,16 @@ func TestRegressionWhitespaceBeforeFragment(t *testing.T) {
 	}
 }
 
-// TestRFC8141ParseURNRx asserts the regex parser also honours RFC 8141
-// (was previously case-sensitive and lacked rq/f-component handling).
-func TestRFC8141ParseURNRx(t *testing.T) {
-	addr, err := ParseURNRx(`URN:MHDA:nt:evm:ct:60:ci:1?+x=y`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := addr.String(); got != `urn:mhda:nt:evm:ct:60:ci:1` {
-		t.Errorf("got %q", got)
-	}
-}
-
 // TestHashFunctions covers the four hash methods on Address. Hash and
 // NSSHash use SHA-1 (kept for backward compatibility); Hash256 and NSSHash256
 // use SHA-256. All four must produce stable, deterministic output and the
 // SHA-256 forms must differ from the SHA-1 forms.
 func TestHashFunctions(t *testing.T) {
-	addr1, err := ParseURN(`urn:mhda:nt:evm:ct:60:ci:1`)
+	addr1, err := ParseURN(`urn:mhda:nt:evm:ci:1:ct:60`)
 	if err != nil {
 		t.Fatal(err)
 	}
-	addr2, err := ParseURN(`urn:mhda:nt:evm:ct:60:ci:1`)
+	addr2, err := ParseURN(`urn:mhda:nt:evm:ci:1:ct:60`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1687,7 +1694,7 @@ func TestHashFunctions(t *testing.T) {
 	}
 
 	// Different inputs should yield different SHA-256 hashes (spot check)
-	addrB, _ := ParseURN(`urn:mhda:nt:evm:ct:60:ci:2`)
+	addrB, _ := ParseURN(`urn:mhda:nt:evm:ci:2:ct:60`)
 	if addr1.Hash256() == addrB.Hash256() {
 		t.Error("distinct URNs produced same Hash256()")
 	}
@@ -1719,9 +1726,10 @@ func TestSLIP10ProgrammaticConstruction(t *testing.T) {
 		{Index: 0, IsHardened: true},
 		{Index: 0, IsHardened: true},
 	})
-	chain := NewChain(Solana, SOL, "mainnet")
+	chain := NewChain(Solana, "mainnet")
+	chain.SetCoinType(SOL)
 	addr := NewAddress(chain, dp)
-	want := `urn:mhda:nt:sol:ct:501:ci:mainnet:dt:slip10:dp:m/44'/501'/0'/0'`
+	want := `urn:mhda:nt:solana:ci:mainnet:ct:501:dt:slip10:dp:m/44'/501'/0'/0'`
 	if got := addr.String(); got != want {
 		t.Errorf("String() = %q, want %q", got, want)
 	}

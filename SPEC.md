@@ -14,38 +14,51 @@ in this repository conforms to it.
 ### 1.1 Syntax
 
 ```
-urn:mhda:nt:<network>:ct:<slip44>:ci:<chain_id>:dt:<derivation>:dp:<path>:aa:<algorithm>:af:<format>:ap:<prefix>:as:<suffix>
+urn:mhda:nt:<network>:ci:<chain_id>:ct:<slip44>:dt:<derivation>:dp:<path>:aa:<algorithm>:af:<format>:ap:<prefix>:as:<suffix>:wt:<wallet_type>:wi:<wallet_id>
 ```
 
 The `urn:` and the NID `mhda` are case-insensitive (RFC 8141 §5.1). Component
 keys (`nt`, `dt`, etc.) are lowercase by convention and are accepted only in
-that form. The canonical serialised form is fully lowercase.
+that form. Enum-valued components (`nt`, `dt`, `aa`, `af`) normalise to
+lowercase in the canonical form; free-form values (`ci`, `ap`, `as`, `wt`,
+`wi`) are case-preserving and round-trip verbatim.
 
 ### 1.2 Components
 
 | Key  | Name                | Required | Type   | Default                  |
 |------|---------------------|----------|--------|--------------------------|
 | `nt` | Network type        | yes      | string | -                        |
-| `ct` | Coin type (SLIP-44) | yes      | uint32 | -                        |
 | `ci` | Chain ID            | yes      | string | -                        |
+| `ct` | Coin type (SLIP-44) | no       | uint32 | none (metadata)          |
 | `dt` | Derivation type     | no       | string | `root`                   |
 | `dp` | Derivation path    | no       | string | empty (when `dt=root`)   |
 | `aa` | Address algorithm   | no       | string | per-network default      |
 | `af` | Address format      | no       | string | per-network default      |
 | `ap` | Address prefix      | no       | string | none                     |
 | `as` | Address suffix      | no       | string | none                     |
+| `wt` | Wallet type         | no       | string | none                     |
+| `wi` | Wallet ID           | no       | string | none                     |
 
 Optional components are emitted in canonical output ONLY when explicitly set.
 A short input form round-trips back to the same short form; a long form
 round-trips back to the same long form.
 
+The chain identity is the `(nt, ci)` pair. The `ct` component is OPTIONAL
+SLIP-44 coin-type metadata: it never participates in the chain identity or in
+chain keys (see §1.6 and §10). For HD addresses the coin type is already
+carried by the derivation domain (`dt` + `dp`), so `ct` exists purely as an
+annotation for consumers that need the registry value without parsing a path
+(and for non-HD networks that have no path at all).
+
 ### 1.3 Required ordering
 
-Component order in the canonical form is chain-domain first
-(`nt`, `ct`, `ci`), then derivation domain (`dt`, `dp`), then optional
-address-format metadata (`aa`, `af`, `ap`, `as`). The chain-domain prefix
-`nt:<network>:ct:<slip44>:ci:<chain_id>` is itself a valid NSS chain key
-returned by `Chain.String()` and consumed by `ChainFromKey` / `ChainFromNSS`.
+Component order in the canonical form is the chain identity first
+(`nt`, `ci`) — so a chain key is always a strict prefix of the NSS — then the
+optional coin-type metadata (`ct`), the derivation domain (`dt`, `dp`),
+address-format metadata (`aa`, `af`, `ap`, `as`), and the wallet domain
+(`wt`, `wi`) last. The chain-identity prefix `nt:<network>:ci:<chain_id>` is
+itself a valid NSS chain key returned by `Chain.String()` and consumed by
+`ChainFromKey` / `ChainFromNSS`.
 
 Parsers MUST accept any ordering on input, and the reference implementation
 does so.
@@ -59,16 +72,38 @@ interpreted; they are stripped before parsing:
 - `?=<q-component>` (query)
 - `#<f-component>` (fragment)
 
-Example: `urn:mhda:nt:evm:ct:60:ci:1?+resolver=example.com#sec` parses
+Example: `urn:mhda:nt:evm:ci:1?+resolver=example.com#sec` parses
 identically to the bare URN; `String()` does not preserve these elements.
 
 ### 1.5 Charset
 
 NSS values must consist of ASCII characters allowed by RFC 8141 NSS production
-(`pchar / "/"` per RFC 3986). The reference implementation does not currently
-percent-encode and rejects unescaped whitespace inside values. If a value
-needs to contain `:` (currently no in-tree value does), percent-encoding
-support must be added.
+(`pchar / "/"` per RFC 3986). The reference implementation enforces printable
+ASCII (0x21–0x7E) for every value: control bytes, whitespace of any kind and
+non-ASCII bytes are rejected. Only ASCII whitespace is trimmed around the URN
+and around values — a Unicode space is malformed input, never decoration to
+strip. Percent-encoding is not implemented; if a value needs to contain `:`
+(currently no in-tree value does), percent-encoding support must be added.
+
+### 1.6 Wallet domain
+
+The wallet domain binds an address to a wallet context. Both components are
+free-form strings under the §1.5 charset rule, independently optional (either
+may appear without the other), and orthogonal to validation — they carry no
+compatibility semantics.
+
+- `wt` (wallet type): the client or protocol the address is exposed through,
+  e.g. `web3`, `metamask`, `tonconnect`.
+- `wi` (wallet id): an identifier binding the address to a concrete wallet
+  instance, e.g. a UUID or an HD root key fingerprint.
+
+When set, the wallet domain participates in the serialised NSS (and therefore
+in the NSS hashes, §9); it is never part of the chain key.
+
+Because these values are typically client-supplied, the setters validate them
+against NSS-corrupting characters: a value may not contain `:` (component
+injection on re-parse), `?` or `#` (RFC 8141 r/q/f truncation), or
+whitespace. The same rule applies to the free-form `ap` / `as` values.
 
 ## 2. Network Catalogue
 
@@ -80,26 +115,33 @@ derivation type to be members of the corresponding set.
 ROOT (no derivation path) is permitted on every network and represents the
 non-HD form.
 
-| `nt`   | SLIP-44 | Algorithms                                | Formats                                               | Derivations                            | Default `aa` | Default `af` |
-|--------|---------|-------------------------------------------|-------------------------------------------------------|----------------------------------------|--------------|--------------|
-| btc    | 0       | secp256k1                                 | p2pkh, p2sh, p2wpkh, p2wsh, p2tr, bech32, bech32m     | bip32, bip44, bip49, bip84, bip86      | secp256k1    | -            |
-| evm    | 60      | secp256k1                                 | hex                                                   | bip32, bip44                           | secp256k1    | hex          |
-| avm    | 9000    | secp256k1                                 | hex, bech32                                           | bip44                                  | secp256k1    | -            |
-| tvm    | 195     | secp256k1                                 | base58                                                | bip44                                  | secp256k1    | base58       |
-| cosmos | 118     | secp256k1, ed25519                        | bech32                                                | bip44, cip11                           | secp256k1    | bech32       |
-| sol    | 501     | ed25519                                   | base58                                                | slip10                                 | ed25519      | base58       |
-| xrp    | 144     | secp256k1, ed25519                        | base58                                                | bip44                                  | secp256k1    | base58       |
-| xlm    | 148     | ed25519                                   | strkey                                                | slip10                                 | ed25519      | strkey       |
-| near   | 397     | ed25519, secp256k1                        | hex                                                   | slip10, bip44                          | ed25519      | hex          |
-| apt    | 637     | ed25519, secp256k1                        | hex                                                   | slip10, bip44                          | ed25519      | hex          |
-| sui    | 784     | ed25519, secp256k1, secp256r1             | hex                                                   | slip10, bip54, bip74                   | ed25519      | hex          |
-| ada    | 1815    | ed25519                                   | bech32, base58                                        | cip1852                                | ed25519      | bech32       |
-| algo   | 283     | ed25519                                   | base32                                                | slip10                                 | ed25519      | base32       |
-| ton    | 607     | ed25519                                   | base64url, hex                                        | slip10                                 | ed25519      | base64url    |
+The SLIP-44 column documents the registry value conventionally carried by the
+optional `ct` metadata; it is informative, not part of the chain identity.
+
+| `nt`      | SLIP-44 | Algorithms                                | Formats                                               | Derivations                            | Default `aa` | Default `af` |
+|-----------|---------|-------------------------------------------|-------------------------------------------------------|----------------------------------------|--------------|--------------|
+| bitcoin   | 0       | secp256k1                                 | p2pkh, p2sh, p2wpkh, p2wsh, p2tr, bech32, bech32m     | bip32, bip44, bip49, bip84, bip86      | secp256k1    | -            |
+| evm       | 60      | secp256k1                                 | hex                                                   | bip32, bip44                           | secp256k1    | hex          |
+| avalanche | 9000    | secp256k1                                 | hex, bech32                                           | bip44                                  | secp256k1    | -            |
+| tron      | 195     | secp256k1                                 | base58                                                | bip44                                  | secp256k1    | base58       |
+| cosmos    | 118     | secp256k1, ed25519                        | bech32                                                | bip44, cip11                           | secp256k1    | bech32       |
+| solana    | 501     | ed25519                                   | base58                                                | slip10                                 | ed25519      | base58       |
+| xrpl      | 144     | secp256k1, ed25519                        | base58                                                | bip44                                  | secp256k1    | base58       |
+| stellar   | 148     | ed25519                                   | strkey                                                | slip10                                 | ed25519      | strkey       |
+| near      | 397     | ed25519, secp256k1                        | hex                                                   | slip10, bip44                          | ed25519      | hex          |
+| aptos     | 637     | ed25519, secp256k1                        | hex                                                   | slip10, bip44                          | ed25519      | hex          |
+| sui       | 784     | ed25519, secp256k1, secp256r1             | hex                                                   | slip10, bip54, bip74                   | ed25519      | hex          |
+| cardano   | 1815    | ed25519                                   | bech32, base58                                        | cip1852                                | ed25519      | bech32       |
+| algorand  | 283     | ed25519                                   | base32                                                | slip10                                 | ed25519      | base32       |
+| ton       | 607     | ed25519                                   | base64url, hex                                        | slip10                                 | ed25519      | base64url    |
+
+Network-type values are the commonly accepted network names, lowercase.
+`evm` is the exception by design: it covers many independent networks, so it
+keeps the family name rather than any flagship chain's name.
 
 ### 2.1 Per-network notes
 
-#### Bitcoin (`btc`)
+#### Bitcoin (`bitcoin`)
 Multiple legitimate scripts; format must be specified explicitly under strict
 validation. `ap` is conventionally `1` (P2PKH), `3` (P2SH), `bc1q` (bech32),
 `bc1p` (bech32m / Taproot).
@@ -108,7 +150,7 @@ validation. `ap` is conventionally `1` (P2PKH), `3` (P2SH), `bc1q` (bech32),
 Single canonical format (hex). Chain ID typically a numeric chain ID such as
 `1`, `0xa86a`, `0x10`.
 
-#### Avalanche (`avm`)
+#### Avalanche (`avalanche`)
 C-Chain uses hex (EVM-compatible); X/P-Chain use bech32 with HRPs `X-avax`,
 `P-avax`. No default format because both are legitimate.
 
@@ -116,15 +158,15 @@ C-Chain uses hex (EVM-compatible); X/P-Chain use bech32 with HRPs `X-avax`,
 Cosmos chains traditionally use BIP-44 with coin type 118; some deployments
 register their own SLIP-44 entries. CIP-11 is `m/44'/118'/account'/charge_extra/address`.
 
-#### Solana (`sol`)
+#### Solana (`solana`)
 SLIP-10 ed25519 only. Common path forms: `m/44'/501'`, `m/44'/501'/account'`,
 `m/44'/501'/account'/0'` (Phantom / Solflare convention).
 
-#### XRP Ledger (`xrp`)
+#### XRP Ledger (`xrpl`)
 secp256k1 is the historical default; ed25519 is supported by newer wallets.
 Addresses use base58 with XRPL's custom alphabet (start with `r`).
 
-#### Stellar (`xlm`)
+#### Stellar (`stellar`)
 SEP-0005 mandates SLIP-10 ed25519 with `m/44'/148'/account'` (3 levels, all
 hardened). StrKey is base32 of `version_byte || payload || CRC16-XMODEM` per
 SEP-0023. Common version bytes: `G` (account), `S` (seed), `M` (muxed),
@@ -135,7 +177,7 @@ ed25519-implicit accounts use raw 64-char hex of pubkey. ETH-implicit accounts
 use `0x` + 40 hex from secp256k1 + keccak256. Named accounts (`alice.near`)
 are not HD-derived and not represented by MHDA.
 
-#### Aptos (`apt`)
+#### Aptos (`aptos`)
 ed25519 path `m/44'/637'/account'/change'/index'` (all 5 hardened, enforced by
 aptos-ts-sdk). secp256k1 path `m/44'/637'/account'/change/index` (BIP-44).
 
@@ -151,14 +193,14 @@ secp256r1:  m/74'/784'/account'/change/index     (BIP-32, purpose=74')
 Address = Blake2b-256(flag || pubkey), 0x + 64 hex chars. Flag bytes:
 0x00 ed25519, 0x01 secp256k1, 0x02 secp256r1.
 
-#### Cardano (`ada`)
+#### Cardano (`cardano`)
 BIP32-Ed25519 (extended keys with soft-derivation, distinct from SLIP-10
 ed25519). Canonical HD path is CIP-1852: `m/1852'/1815'/account'/role/index`.
 Roles per CIP-1852: 0=external, 1=internal, 2=staking, 3=DRep,
 4=cc-cold, 5=cc-hot. Shelley addresses use bech32 (no BIP-173 length cap, per
 CIP-19); Byron-era addresses use base58 and remain on-chain.
 
-#### Algorand (`algo`)
+#### Algorand (`algorand`)
 Native scheme is non-HD: a 25-word BIP-39-style mnemonic encodes the
 32-byte ed25519 seed directly. Canonical URNs use `dt:root`. Some third-party
 wallets layer SLIP-10 at `m/44'/283'/account'/0'/0'`; this is accepted but is
@@ -254,7 +296,10 @@ Performs structural validation only:
 - All component values non-empty.
 - No duplicate component keys.
 - Network type is one of the registered values.
-- Coin type is a valid 32-bit unsigned integer (decimal or `0x`-prefixed hex).
+- Coin type, if present, is a valid 32-bit unsigned integer, spelled as
+  plain decimal or `0x`-prefixed hex only (no other integer-literal forms).
+- Values contain no whitespace (interior whitespace is rejected; surrounding
+  whitespace around the whole URN is trimmed).
 - Chain ID is non-empty.
 - Derivation type, if present, is one of the registered constants.
 - Derivation path, if present, matches the regex of its derivation type.
@@ -297,9 +342,11 @@ text.
 | `ErrInvalidNSS`              | Malformed namespace-specific string                      |
 | `ErrMissingNetworkType`      | `nt` absent                                              |
 | `ErrInvalidNetworkType`      | `nt` value not registered                                |
-| `ErrMissingCoinType`         | `ct` absent                                              |
-| `ErrInvalidCoinType`         | `ct` not a uint32                                        |
+| `ErrInvalidCoinType`         | `ct` present but not a uint32                            |
 | `ErrMissingChainID`          | `ci` absent                                              |
+| `ErrCoinTypeInChainKey`      | `ChainFromKey` input carries `ct` (pre-1.1 key format)   |
+| `ErrInvalidChainKey`         | `ChainFromKey` input is not the canonical identity form  |
+| `ErrInvalidValue`            | Free-form setter value with `:`/`?`/`#`/whitespace       |
 | `ErrInvalidDerivationType`   | `dt` value not registered                                |
 | `ErrInvalidDerivationPath`   | `dp` does not match the regex of `dt`                    |
 | `ErrInvalidAlgorithm`        | `aa` value not registered                                |
@@ -336,26 +383,42 @@ Two pairs of hash methods are exposed on `Address`:
 | `Hash256`     | SHA-256   | hex (64 chars)   |
 | `NSSHash256`  | SHA-256   | hex (64 chars)   |
 
-`Hash` and `NSSHash` are retained for backward compatibility with existing
-identifiers. SHA-1 is no longer collision-resistant; new uses should prefer
-`Hash256` / `NSSHash256`.
+`Hash` and `NSSHash` are kept only so identifiers generated by this version
+of the format stay stable. SHA-1 is no longer collision-resistant; new uses
+should prefer `Hash256` / `NSSHash256`.
 
 ## 10. Chain API
 
-The chain-domain triple `(nt, ct, ci)` is exposed as a standalone `Chain`
-type with its own factory functions:
+The chain identity pair `(nt, ci)` is exposed as a standalone `Chain` type
+with its own factory functions:
 
 | Constructor                | Purpose                                                  |
 |----------------------------|----------------------------------------------------------|
-| `NewChain(nt, ct, ci)`     | Programmatic construction.                               |
-| `ChainFromNSS(s string)`   | Parse a chain-only NSS form `nt:X:ct:Y:ci:Z`.            |
+| `NewChain(nt, ci)`         | Programmatic construction.                               |
+| `ChainFromNSS(s string)`   | Extract the chain domain from any NSS (lenient).         |
 | `ChainFromKey(key)`        | Parse a `ChainKey` (alias of string) produced by `Key()`.|
 
 `Chain.String()` and `Chain.Key()` both return the canonical chain key
-`nt:<network>:ct:<coin>:ci:<chainid>`, suitable for use as a map key, cache
-key or content hash input. The format is a strict prefix of any full URN
-NSS, so callers can extract a chain key from a `*Address` via
-`addr.Chain().Key()`.
+`nt:<network>:ci:<chainid>`, suitable for use as a map key, cache key or
+content hash input. The format is a strict prefix of any full URN NSS, so
+callers can extract a chain key from a `*Address` via `addr.Chain().Key()`.
+
+The two parsing paths differ in strictness:
+
+- `ChainFromNSS` accepts any NSS (including a full address form) and extracts
+  `nt`, `ci` and the optional `ct` metadata, ignoring everything else.
+- `ChainFromKey` accepts the canonical identity form only. An input
+  carrying `ct` is rejected with `ErrCoinTypeInChainKey` — a chain key in
+  the pre-1.1 format must fail loudly, never be silently reinterpreted.
+  Anything else that is not byte-identical to the canonical
+  `nt:<network>:ci:<chain_id>` rendering (other known components, unknown
+  tokens, reordering, non-canonical case) is rejected with
+  `ErrInvalidChainKey`: keys compare as plain strings, so every accepted
+  input must be the canonical string. Surrounding whitespace is trimmed.
+
+The optional SLIP-44 metadata is attached programmatically via
+`Chain.SetCoinType` / cleared via `Chain.ClearCoinType`, and read via
+`Chain.CoinType()` / `Chain.HasCoinType()`. It never affects the key.
 
 ## 11. Codec Integration
 

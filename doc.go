@@ -5,12 +5,16 @@
 //
 // # URN structure
 //
-//	urn:mhda:nt:<network>:ct:<slip44>:ci:<chain_id>:dt:<derivation>:dp:<path>:aa:<algorithm>:af:<format>:ap:<prefix>:as:<suffix>
+//	urn:mhda:nt:<network>:ci:<chain_id>:ct:<slip44>:dt:<derivation>:dp:<path>:aa:<algorithm>:af:<format>:ap:<prefix>:as:<suffix>:wt:<wallet_type>:wi:<wallet_id>
 //
-// Only nt, ct and ci are required. Optional fields aa/af/ap/as are emitted on
-// String() only when explicitly set, preserving short-form round-trip. The
-// chain-domain prefix nt:X:ct:Y:ci:Z is itself a valid ChainKey returned by
-// Chain.String() and consumed by ChainFromKey / ChainFromNSS.
+// Only nt and ci are required; the pair is the chain identity. The optional
+// ct component carries SLIP-44 coin-type metadata and is not part of the
+// identity. Optional fields ct/aa/af/ap/as/wt/wi are emitted on String() only
+// when explicitly set, preserving short-form round-trip. The chain-identity
+// prefix nt:X:ci:Z is itself a valid ChainKey returned by Chain.String() and
+// consumed by ChainFromKey / ChainFromNSS. The wallet domain (wt/wi) binds an
+// address to a wallet context: a client type ("web3", "metamask",
+// "tonconnect") and a wallet instance id (UUID, HD root fingerprint).
 //
 // # Parsing
 //

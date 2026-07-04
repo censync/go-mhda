@@ -1,37 +1,69 @@
 package go_mhda
 
+// CoinType is a SLIP-44 coin type (32-bit unsigned integer).
+type CoinType uint32
+
+// SLIP-44 registered coin types, ascending by index
+// (https://github.com/satoshilabs/slips/blob/master/slip-0044.md).
 const (
-	// btc
 	BTC  = CoinType(0)
 	LTC  = CoinType(2)
 	DOGE = CoinType(3)
-
-	// evm
-	ETH   = CoinType(60)
-	BNB   = CoinType(714) // old stype
-	BSC   = CoinType(9006)
-	MATIC = CoinType(966)
-	GLMR  = CoinType(1284)
-
 	DASH = CoinType(5)
-
-	XMR  = CoinType(128)
-	ZEC  = CoinType(133)
-	XRP  = CoinType(144)
-	XLM  = CoinType(148)
-	ATOM = CoinType(168)
-	TRX  = CoinType(195)
-	ALGO = CoinType(283)
-	NEAR = CoinType(397)
-	SOL  = CoinType(501)
-	APT  = CoinType(637)
-	TON  = CoinType(607)
-	SUI  = CoinType(784)
-	ADA  = CoinType(1815)
-
-	//https://support.avax.network/en/articles/7004986-what-derivation-paths-does-avalanche-use
+	ETH  = CoinType(60)
+	ETC  = CoinType(61)
+	// Cosmos Hub. The registry assigns 118 to ATOM (168 belongs to
+	// Helleniccoin); 118 also matches the coin level of CIP-11 paths.
+	ATOM  = CoinType(118)
+	XMR   = CoinType(128)
+	ZEC   = CoinType(133)
+	XRP   = CoinType(144)
+	BCH   = CoinType(145)
+	XLM   = CoinType(148)
+	EOS   = CoinType(194)
+	TRX   = CoinType(195)
+	ICP   = CoinType(223)
+	ALGO  = CoinType(283)
+	CKB   = CoinType(309)
+	ZIL   = CoinType(313)
+	LUNA  = CoinType(330)
+	DOT   = CoinType(354)
+	NEAR  = CoinType(397)
+	KSM   = CoinType(434)
+	KAVA  = CoinType(459)
+	FIL   = CoinType(461)
+	SOL   = CoinType(501)
+	CSPR  = CoinType(506)
+	EGLD  = CoinType(508)
+	SCRT  = CoinType(529)
+	FLOW  = CoinType(539)
+	TON   = CoinType(607)
+	APT   = CoinType(637)
+	BNB   = CoinType(714) // BNB Beacon Chain (old style); BSC uses 9006
+	SUI   = CoinType(784)
+	VET   = CoinType(818)
+	RUNE  = CoinType(931)
+	MATIC = CoinType(966)
+	FTM   = CoinType(1007)
+	ONE   = CoinType(1023)
+	GLMR  = CoinType(1284)
+	XTZ   = CoinType(1729)
+	ADA   = CoinType(1815)
+	HYPE  = CoinType(2457)
+	HBAR  = CoinType(3030)
+	MOVE  = CoinType(3073)
+	STX   = CoinType(5757)
+	BERA  = CoinType(8008)
+	XCH   = CoinType(8444)
+	// https://support.avax.network/en/articles/7004986-what-derivation-paths-does-avalanche-use
 	AVAX = CoinType(9000)
+	STRK = CoinType(9004)
+	BSC  = CoinType(9006)
+	MINA = CoinType(12586)
+	WAX  = CoinType(14001)
+	KAS  = CoinType(111111)
+	OSMO = CoinType(10000118)
+	SEI  = CoinType(19000118)
+	INJ  = CoinType(22000119)
+	MON  = CoinType(268435779)
 )
-
-// CoinType is a SLIP-44 coin type (32-bit unsigned integer).
-type CoinType uint32

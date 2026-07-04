@@ -4,38 +4,41 @@ import "errors"
 
 type NetworkType string
 
+// Network types use the commonly accepted network names, lowercase. Family
+// types that cover a single ecosystem carry that ecosystem's name (tron,
+// avalanche); "evm" stays as-is because it covers many independent networks.
 const (
-	Bitcoin      = NetworkType(`btc`)
+	Bitcoin      = NetworkType(`bitcoin`)
 	EthereumVM   = NetworkType(`evm`)
-	AvalancheVM  = NetworkType(`avm`)
-	TronVM       = NetworkType(`tvm`)
+	AvalancheVM  = NetworkType(`avalanche`)
+	TronVM       = NetworkType(`tron`)
 	Cosmos       = NetworkType(`cosmos`)
-	Solana       = NetworkType(`sol`)
-	XRPLedger    = NetworkType(`xrp`)
-	Stellar      = NetworkType(`xlm`)
+	Solana       = NetworkType(`solana`)
+	XRPLedger    = NetworkType(`xrpl`)
+	Stellar      = NetworkType(`stellar`)
 	NEARProtocol = NetworkType(`near`)
-	Aptos        = NetworkType(`apt`)
+	Aptos        = NetworkType(`aptos`)
 	Sui          = NetworkType(`sui`)
-	Cardano      = NetworkType(`ada`)
-	Algorand     = NetworkType(`algo`)
+	Cardano      = NetworkType(`cardano`)
+	Algorand     = NetworkType(`algorand`)
 	Toncoin      = NetworkType(`ton`)
 )
 
 var ntIndex = map[string]NetworkType{
-	`btc`:    Bitcoin,
-	`evm`:    EthereumVM,
-	`avm`:    AvalancheVM,
-	`tvm`:    TronVM,
-	`cosmos`: Cosmos,
-	`sol`:    Solana,
-	`xrp`:    XRPLedger,
-	`xlm`:    Stellar,
-	`near`:   NEARProtocol,
-	`apt`:    Aptos,
-	`sui`:    Sui,
-	`ada`:    Cardano,
-	`algo`:   Algorand,
-	`ton`:    Toncoin,
+	`bitcoin`:   Bitcoin,
+	`evm`:       EthereumVM,
+	`avalanche`: AvalancheVM,
+	`tron`:      TronVM,
+	`cosmos`:    Cosmos,
+	`solana`:    Solana,
+	`xrpl`:      XRPLedger,
+	`stellar`:   Stellar,
+	`near`:      NEARProtocol,
+	`aptos`:     Aptos,
+	`sui`:       Sui,
+	`cardano`:   Cardano,
+	`algorand`:  Algorand,
+	`ton`:       Toncoin,
 }
 
 // NetworkTypeFromString parses a string into a NetworkType. The lookup is
