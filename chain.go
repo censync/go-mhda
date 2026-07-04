@@ -11,23 +11,62 @@ type ChainId string
 // ChainKey - string identifier for declaration any chain or subchain
 type ChainKey string
 
+// Chain describes a network: the network type plus the chain id. The pair
+// (nt, ci) is the chain identity; Key() and String() serialize exactly that
+// pair, and chain keys compare as plain strings.
+//
+// An optional SLIP-44 coin type may be attached as metadata (SetCoinType).
+// It is carried by the full URN form (the "ct" component) but is NOT part of
+// the chain identity: it never appears in Key()/String().
 type Chain struct {
 	networkType NetworkType
-	coinType    CoinType
 	chainId     ChainId
+	coinType    CoinType
+	hasCoinType bool
 }
 
-func NewChain(networkType NetworkType, coinType CoinType, chainId ChainId) *Chain {
-	return &Chain{networkType: networkType, coinType: coinType, chainId: chainId}
+func NewChain(networkType NetworkType, chainId ChainId) *Chain {
+	return &Chain{networkType: networkType, chainId: chainId}
 }
 
-// ChainFromKey parses a Chain from a key produced by Chain.Key().
+// ChainFromKey parses a Chain from a key produced by Chain.Key(). A chain key
+// is the canonical identity form "nt:<network>:ci:<chain_id>" and nothing
+// else. "ct" (the pre-1.1 key format) is rejected with the dedicated
+// ErrCoinTypeInChainKey so that legacy keys fail loudly instead of being
+// silently reinterpreted; any other known component and any residue (unknown
+// tokens, reordering, non-canonical spelling) is rejected with
+// ErrInvalidChainKey — keys compare as plain strings, so every accepted
+// input must BE the canonical string.
 func ChainFromKey(chainKey ChainKey) (*Chain, error) {
-	return ChainFromNSS(string(chainKey))
+	trimmed := asciiTrim(string(chainKey))
+	components, err := parseNSS(trimmed)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := components[compCoinType]; ok {
+		return nil, ErrCoinTypeInChainKey
+	}
+	for key := range components {
+		if key != compNetworkType && key != compChainId {
+			return nil, fmt.Errorf("%w: unexpected component %q", ErrInvalidChainKey, key)
+		}
+	}
+	if _, ok := components[compNetworkType]; !ok {
+		return nil, ErrMissingNetworkType
+	}
+	chain, err := parseChain(components)
+	if err != nil {
+		return nil, err
+	}
+	if chain.String() != trimmed {
+		return nil, fmt.Errorf("%w: not in canonical form: %q", ErrInvalidChainKey, trimmed)
+	}
+	return chain, nil
 }
 
-// ChainFromNSS parses just the chain-domain components ("nt", "ct", "ci")
-// from the given NSS string. Other components are tolerated and ignored.
+// ChainFromNSS parses the chain-domain components ("nt", "ci" and the
+// optional "ct" metadata) from the given NSS string. Other components are
+// tolerated and ignored, so a full address NSS is valid input.
 func ChainFromNSS(src string) (*Chain, error) {
 	components, err := parseNSS(src)
 	if err != nil {
@@ -40,8 +79,8 @@ func ChainFromNSS(src string) (*Chain, error) {
 }
 
 // parseChain extracts and validates the chain-domain components from a
-// component map produced by the NSS parser. Shared by parseAddress and
-// ChainFromNSS.
+// component map produced by the NSS parser. Shared by parseAddress,
+// ChainFromNSS and ChainFromKey.
 func parseChain(m map[string]string) (*Chain, error) {
 	networkType := normalize(m[compNetworkType])
 	if networkType == `` {
@@ -51,34 +90,71 @@ func parseChain(m map[string]string) (*Chain, error) {
 		return nil, fmt.Errorf("%w: %q", ErrInvalidNetworkType, networkType)
 	}
 
-	ct := strings.TrimSpace(m[compCoinType])
-	if ct == `` {
-		return nil, ErrMissingCoinType
-	}
-	coinType, err := strconv.ParseUint(ct, 0, 32)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %q", ErrInvalidCoinType, ct)
-	}
-
 	chainID, ok := m[compChainId]
 	if !ok || strings.TrimSpace(chainID) == "" {
 		return nil, ErrMissingChainID
 	}
 
-	return &Chain{
+	chain := &Chain{
 		networkType: NetworkType(networkType),
-		coinType:    CoinType(coinType),
 		chainId:     ChainId(chainID),
-	}, nil
+	}
+
+	if ct, ok := m[compCoinType]; ok {
+		coinType, err := parseCoinType(strings.TrimSpace(ct))
+		if err != nil {
+			return nil, err
+		}
+		chain.coinType = coinType
+		chain.hasCoinType = true
+	}
+
+	return chain, nil
+}
+
+// parseCoinType parses a SLIP-44 value from its two documented spellings:
+// plain decimal or 0x-prefixed hex. Go integer-literal extras (0o/0b
+// prefixes, digit-group underscores) are deliberately rejected — allowing
+// several spellings of one value would defeat duplicate detection and the
+// canonical-form guarantees.
+func parseCoinType(s string) (CoinType, error) {
+	var v uint64
+	var err error
+	if len(s) > 2 && (s[:2] == "0x" || s[:2] == "0X") {
+		v, err = strconv.ParseUint(s[2:], 16, 32)
+	} else {
+		v, err = strconv.ParseUint(s, 10, 32)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("%w: %q", ErrInvalidCoinType, s)
+	}
+	return CoinType(v), nil
 }
 
 func (c *Chain) SetNetworkType(networkType NetworkType) { c.networkType = networkType }
-func (c *Chain) SetCoinType(coinType CoinType)          { c.coinType = coinType }
 func (c *Chain) SetChainId(chainId ChainId)             { c.chainId = chainId }
 
+// SetCoinType attaches the optional SLIP-44 coin-type metadata.
+func (c *Chain) SetCoinType(coinType CoinType) {
+	c.coinType = coinType
+	c.hasCoinType = true
+}
+
+// ClearCoinType removes the optional SLIP-44 coin-type metadata.
+func (c *Chain) ClearCoinType() {
+	c.coinType = 0
+	c.hasCoinType = false
+}
+
 func (c *Chain) NetworkType() NetworkType { return c.networkType }
-func (c *Chain) CoinType() CoinType       { return c.coinType }
 func (c *Chain) ChainId() ChainId         { return c.chainId }
+
+// CoinType returns the optional SLIP-44 coin-type metadata, or 0 when unset.
+// Use HasCoinType to distinguish an explicit 0 (Bitcoin) from "not set".
+func (c *Chain) CoinType() CoinType { return c.coinType }
+
+// HasCoinType reports whether the optional coin-type metadata is set.
+func (c *Chain) HasCoinType() bool { return c.hasCoinType }
 
 func (c *Chain) Key() ChainKey {
 	return ChainKey(c.String())
@@ -86,9 +162,11 @@ func (c *Chain) Key() ChainKey {
 
 // String returns the canonical NSS-style chain key:
 //
-//	nt:<network>:ct:<coin>:ci:<chainid>
+//	nt:<network>:ci:<chainid>
 //
-// This format is round-trippable via ChainFromNSS / ChainFromKey.
+// This format is round-trippable via ChainFromKey / ChainFromNSS. The
+// optional coin-type metadata is deliberately excluded: the chain identity
+// is the (network type, chain id) pair.
 func (c *Chain) String() string {
-	return fmt.Sprintf("nt:%s:ct:%d:ci:%s", c.networkType, c.coinType, c.chainId)
+	return fmt.Sprintf("nt:%s:ci:%s", c.networkType, c.chainId)
 }

@@ -27,10 +27,14 @@ func FuzzParseURN(f *testing.F) {
 		"urn:mhda:nt:evm:ct:",
 		"urn:mhda:nt:evm:ct:60:ci",
 		"urn:mhda:nt:evm:ct:60:ci:",
-		"urn:mhda:nt:evm:ct:60:ci:1:xx:y",
+		"urn:mhda:nt:evm:ci:1:ct:60:xx:y",
 		"urn:mhda:::::::",
-		"urn:mhda:nt:evm:ct:60:ci:1:aa:",
-		"urn:mhda:nt:evm:ct:60:ci:1:af:",
+		"urn:mhda:nt:evm:ci:1:ct:60:aa:",
+		"urn:mhda:nt:evm:ci:1:ct:60:af:",
+		"urn:mhda:nt:evm:ci:1:wt:web3:wi:5f2a8c31",
+		"urn:mhda:nt:evm:ci:1:wt:",
+		"urn:mhda:nt:evm:ci:1:wi:",
+		"urn:mhda:wt:web3:nt:evm:ci:1",
 	} {
 		f.Add(s)
 	}
@@ -132,7 +136,8 @@ func FuzzParseNSS(f *testing.F) {
 		f.Add(s[prefixOffset:])
 	}
 	for _, s := range []string{
-		"", "n", "nt", "nt:", "nt:evm", "nt:evm:ct:60:ci:1",
+		"", "n", "nt", "nt:", "nt:evm", "nt:evm:ci:1:ct:60", "nt:evm:ci:1",
+		"nt:evm:ci:1:wt:web3:wi:5f2a8c31",
 	} {
 		f.Add(s)
 	}

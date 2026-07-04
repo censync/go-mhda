@@ -2,27 +2,26 @@ package go_mhda
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 )
 
 const (
-	prefixMHDA          = `urn:mhda:`
-	prefixOffset        = len(prefixMHDA)
-	indexComponentIndex = 1
-	indexComponentValue = 2
+	prefixMHDA   = `urn:mhda:`
+	prefixOffset = len(prefixMHDA)
 
 	// NSS components
 
 	// Chain domain
-	// compNetworkType is Network Type description, e.g. "evm", "tvm", "avm", "btc", "cosmos"
+	// compNetworkType is Network Type description, e.g. "evm", "tron",
+	// "avalanche", "bitcoin", "cosmos"
 	compNetworkType = `nt`
-	// compCoinType is Coin Type description, according SLIP-44 list
-	// (https://github.com/satoshilabs/slips/blob/master/slip-0044.md), e.g. "0", "60", "195", "118".
-	compCoinType = `ct`
 	// compChainId is Network Id (Chain Id) description, e.g. for evm hex: "0x1", "0x10",
 	// for Cosmos - string "axelar", etc.
 	compChainId = `ci`
+	// compCoinType is the OPTIONAL Coin Type metadata, according SLIP-44 list
+	// (https://github.com/satoshilabs/slips/blob/master/slip-0044.md), e.g.
+	// "0", "60", "195", "118". Not part of the chain identity.
+	compCoinType = `ct`
 
 	// Derivation path domain
 	compDerivationType = `dt`
@@ -33,26 +32,35 @@ const (
 	compAddressFormat    = `af`
 	compAddressPrefix    = `ap`
 	compAddressSuffix    = `as`
+
+	// Wallet domain (optional)
+	// compWalletType is a free-form wallet/client type, e.g. "web3",
+	// "metamask", "tonconnect".
+	compWalletType = `wt`
+	// compWalletId is a free-form wallet instance identifier, e.g. a UUID or
+	// an HD root key fingerprint.
+	compWalletId = `wi`
 )
 
 var (
 	// componentsNames is the canonical emission order for NSS:
-	//   nt:ct:ci:dt:dp:aa:af:ap:as
-	// chain-domain (nt/ct/ci) first, then derivation, then address-format
-	// metadata.
+	//   nt:ci:ct:dt:dp:aa:af:ap:as:wt:wi
+	// chain identity (nt/ci) first — so a chain key is always a strict prefix
+	// of the NSS — then the optional coin-type metadata, then derivation,
+	// address-format metadata, and the wallet domain last.
 	componentsNames = []string{
 		compNetworkType,
-		compCoinType,
 		compChainId,
+		compCoinType,
 		compDerivationType,
 		compDerivationPath,
 		compAddressAlgorithm,
 		compAddressFormat,
 		compAddressPrefix,
 		compAddressSuffix,
+		compWalletType,
+		compWalletId,
 	}
-
-	rxComponent = regexp.MustCompile(`:(nt|ct|ci|dt|dp|aa|af|ap|as):([0-9a-z-._~*+=%$&@?'()!,;/#]+)`)
 )
 
 // knownComponents is the lookup set for the split-based parser. Built from
@@ -72,6 +80,29 @@ func hasPrefixFold(s, prefix string) bool {
 	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
 }
 
+// asciiTrim trims ASCII whitespace only. Unicode spaces (NBSP, ideographic
+// space, …) are NOT trimmed: an NSS is ASCII by definition (RFC 8141), so a
+// Unicode space is not decoration to strip — it stays in place and the value
+// check rejects it loudly. Trimming it instead (as a Unicode-aware trim
+// would) silently accepts a malformed URN and diverges from the C++ port.
+func asciiTrim(s string) string {
+	return strings.Trim(s, " \t\n\v\f\r")
+}
+
+// validateValueCharset enforces SPEC §1.5: NSS values consist of printable
+// ASCII only. Control characters, whitespace of any kind and non-ASCII bytes
+// are rejected — they cannot appear in a conforming URN and would serialise
+// into a non-parseable or ambiguous canonical form.
+func validateValueCharset(key, value string) error {
+	for i := 0; i < len(value); i++ {
+		if value[i] < 0x21 || value[i] > 0x7e {
+			return fmt.Errorf("%w: non-ASCII or control byte in value for %q",
+				ErrInvalidNSS, key)
+		}
+	}
+	return nil
+}
+
 // stripRQF strips the optional rq-components ("?+" / "?=") and f-component
 // ("#") trailing the assigned-name part, per RFC 8141 §2. The current parser
 // does not interpret resource/query/fragment metadata; they are silently
@@ -83,39 +114,11 @@ func stripRQF(nss string) string {
 	return nss
 }
 
-// ParseURNRx parses a URN MHDA via a single regex pass. Behaviour matches
-// ParseURN; the regex variant exists primarily for benchmarking.
-func ParseURNRx(src string) (MHDA, error) {
-	src = strings.TrimSpace(src)
-	if !hasPrefixFold(src, prefixMHDA) {
-		return nil, ErrInvalidURN
-	}
-
-	nss := stripRQF(src[prefixOffset:])
-	// Re-prepend a leading colon so the regex's `:(component):` pattern
-	// can match the very first component.
-	submatches := rxComponent.FindAllStringSubmatch(":"+nss, len(componentsNames))
-
-	if len(submatches) == 0 {
-		return nil, fmt.Errorf("%w: no components", ErrInvalidNSS)
-	}
-
-	components := map[string]string{}
-	for i := range submatches {
-		if len(submatches[i]) != 3 {
-			continue
-		}
-		components[submatches[i][indexComponentIndex]] = submatches[i][indexComponentValue]
-	}
-
-	return parseAddress(components)
-}
-
 // ParseURN is the lenient parsing entry point. RFC 8141 §5.1 case-insensitive
 // prefix and §2 rq/f-components are accepted; surrounding whitespace is
 // trimmed.
 func ParseURN(src string) (MHDA, error) {
-	src = strings.TrimSpace(src)
+	src = asciiTrim(src)
 	if !hasPrefixFold(src, prefixMHDA) {
 		return nil, ErrInvalidURN
 	}
@@ -176,12 +179,19 @@ func parseNSS(nss string) (map[string]string, error) {
 		if i+1 >= len(parts) {
 			return nil, fmt.Errorf("%w: missing value for %q", ErrInvalidNSS, key)
 		}
-		// RFC 8141 NSS does not permit unescaped whitespace; trim it so any
-		// trailing space (e.g. from "ci:0 #frag" where stripRQF leaves the
-		// space) does not leak into the canonical form and break round-trip.
-		value := strings.TrimSpace(parts[i+1])
+		// RFC 8141 NSS does not permit unescaped whitespace; trim ASCII
+		// whitespace so any trailing space (e.g. from "ci:0 #frag" where
+		// stripRQF leaves the space) does not leak into the canonical form
+		// and break round-trip.
+		value := asciiTrim(parts[i+1])
 		if value == "" {
 			return nil, fmt.Errorf("%w: empty value for %q", ErrInvalidNSS, key)
+		}
+		// Everything that survives the trim must be printable ASCII —
+		// interior whitespace, control bytes and Unicode spaces are all
+		// malformed input, never silently normalised.
+		if err := validateValueCharset(key, value); err != nil {
+			return nil, err
 		}
 		if _, dup := components[key]; dup {
 			return nil, fmt.Errorf("%w: duplicate component %q", ErrInvalidNSS, key)
