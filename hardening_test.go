@@ -213,7 +213,7 @@ func TestProgrammaticValuesCannotInjectComponents(t *testing.T) {
 		{EthereumVM, "1?=q", ErrInvalidValue},
 		{EthereumVM, "1#f", ErrInvalidValue},
 		{EthereumVM, "a b", ErrInvalidValue},
-		{EthereumVM, " 1", ErrInvalidValue},
+		{EthereumVM, "\u00a01", ErrInvalidValue},
 		{EthereumVM, "", ErrMissingChainID},
 		{EthereumVM, " \t", ErrMissingChainID},
 		{NetworkType("evm:ci:1:dt:bip44"), "1", ErrInvalidNetworkType},
@@ -309,7 +309,7 @@ func TestFromStringHelpersWrapSentinels(t *testing.T) {
 // C++ port. A Unicode space is not trimmed and a letter that lowercases to
 // ASCII (the Kelvin sign) is not folded: both are malformed input.
 func TestNormalisationIsASCIIOnly(t *testing.T) {
-	const kelvin, nbsp, ideo = "K", " ", "　"
+	const kelvin, nbsp, ideo = "\u212a", "\u00a0", "\u3000"
 	addr := mustAddress(t, `urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0`)
 	for name, err := range map[string]error{
 		"AlgorithmFromString":   func() error { _, e := AlgorithmFromString("secp256" + kelvin + "1"); return e }(),
