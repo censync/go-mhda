@@ -46,6 +46,13 @@ of 2^31 or more no longer parses.
   `ErrInvalidDerivationType` on an unregistered type. An `Address` whose
   path has no type serialises like a root address instead of emitting
   empty `dt`/`dp` components.
+- **A derivation path without a derivation type, or under `dt:root`, is
+  refused** with `ErrInvalidDerivationPath`. Both used to be dropped
+  silently: `urn:mhda:nt:evm:ci:1:dp:m/44'/60'/0'/0/0` and
+  `urn:mhda:nt:evm:ci:1:dt:root:dp:m/0` parsed as the root address
+  `urn:mhda:nt:evm:ci:1`, naming the root key instead of the path they
+  spell out. `Address.SetDerivationPath` on a root address accepts only an
+  empty path.
 
 ### Fixed
 

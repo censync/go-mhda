@@ -43,6 +43,11 @@ Optional components are emitted in canonical output ONLY when explicitly set.
 A short input form round-trips back to the same short form; a long form
 round-trips back to the same long form.
 
+`dp` is present exactly when `dt` is a type other than `root`. A `dp`
+without `dt` (which makes the address root) or with `dt:root` is refused
+with `ErrInvalidDerivationPath`: dropping it would make the URN name the root
+key instead of the path it spells out.
+
 The chain identity is the `(nt, ci)` pair. The `ct` component is OPTIONAL
 SLIP-44 coin-type metadata: it never participates in the chain identity or in
 chain keys (see §1.6 and §10). For HD addresses the coin type is already
@@ -315,6 +320,8 @@ Performs structural validation only:
 - Derivation type, if present, is one of the registered constants.
 - Derivation path, if present, matches the regex of its derivation type,
   and every level's index is below 2^31 (§3).
+- Derivation path is present if and only if the derivation type is set and
+  is not `root` (§1.2).
 - Algorithm, if present, is one of the registered constants.
 - Format, if present, is one of the registered constants.
 
@@ -360,7 +367,7 @@ text.
 | `ErrInvalidChainKey`         | `ChainFromKey` input is not the canonical identity form  |
 | `ErrInvalidValue`            | Free-form or chain id value with `:`/`?`/`#`/whitespace  |
 | `ErrInvalidDerivationType`   | `dt` value not registered                                |
-| `ErrInvalidDerivationPath`   | `dp` does not match `dt`, or a level index is >= 2^31    |
+| `ErrInvalidDerivationPath`   | `dp` does not fit `dt` (or no `dt`), or an index >= 2^31 |
 | `ErrInvalidAlgorithm`        | `aa` value not registered                                |
 | `ErrInvalidFormat`           | `af` value not registered                                |
 | `ErrIncompatible`            | Strict validation: triple not allowed for the network    |

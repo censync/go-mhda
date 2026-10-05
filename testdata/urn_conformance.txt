@@ -1,0 +1,28 @@
+# URN conformance table, shared verbatim by go-mhda
+# (testdata/urn_conformance.txt) and the C++ port (tests/data/urn_conformance.txt).
+# Both test suites run every row through the lenient parser; an input one
+# implementation refuses, the other refuses too, with the same error. Edit
+# both copies together.
+#
+# Row forms:
+#   accept urn <input URN> <canonical URN>
+#   accept nss <input NSS> <canonical URN>
+#   refuse urn <error> <input URN>
+#   refuse nss <error> <input NSS>
+# <error> is the C++ error_code name; go-mhda maps it to its sentinel
+# (invalid_nss is ErrInvalidNSS, invalid_derivation_path is
+# ErrInvalidDerivationPath, ...).
+
+# A derivation path needs a derivation type other than root. Without dt the
+# address is root, and a dp there would be dropped: the URN would name the
+# root key instead of the path it spells out.
+refuse urn invalid_derivation_path urn:mhda:nt:evm:ci:1:dp:m/44'/60'/0'/0/0
+refuse urn invalid_derivation_path urn:mhda:nt:evm:ci:1:dt:root:dp:m/0
+refuse urn invalid_derivation_path urn:mhda:nt:evm:ci:1:dt:ROOT:dp:m/0
+refuse urn invalid_derivation_path urn:mhda:nt:ton:ci:mainnet:dt:root:dp:m/44'/607'/0'
+refuse urn invalid_derivation_path urn:mhda:dp:m/44'/60'/0'/0/0:nt:evm:ci:1
+refuse nss invalid_derivation_path nt:evm:ci:1:dp:m/44'/60'/0'/0/0
+refuse urn invalid_derivation_path urn:mhda:nt:evm:ci:1:dt:bip44
+accept urn urn:mhda:nt:ton:ci:mainnet urn:mhda:nt:ton:ci:mainnet
+accept urn urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0 urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0
+accept nss nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0 urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0

@@ -166,8 +166,16 @@ func (a *Address) SetDerivationType(dt string) error {
 	return nil
 }
 
+// SetDerivationPath parses dp under the address' derivation type. A root
+// address has no path: an empty dp is accepted, anything else is refused
+// with ErrInvalidDerivationPath. Dropping it instead would let a URN with a
+// dp but no dt (which parses as root) name the root key rather than the
+// path it spells out.
 func (a *Address) SetDerivationPath(dp string) error {
 	if a.path.derivationType == ROOT {
+		if p := strings.TrimSpace(dp); p != `` {
+			return fmt.Errorf("%w: root derivation must have empty path, got %q", ErrInvalidDerivationPath, p)
+		}
 		return nil
 	}
 
