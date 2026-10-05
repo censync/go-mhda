@@ -115,6 +115,11 @@ of 2^31 or more no longer parses.
   nil `*Address` is still encoded by the codec (as `null`); calling
   `MarshalText` directly on a nil pointer now panics like any value method
   instead of returning `ErrUninitializedAddress`.
+- **The lookup helpers wrap their sentinels.** `AlgorithmFromString`,
+  `FormatFromString` and `NetworkTypeFromString` returned plain
+  `errors.New` values, so `errors.Is` could not tell them apart, unlike
+  `DerivationTypeFromString` and the parsers. They now wrap
+  `ErrInvalidAlgorithm`, `ErrInvalidFormat` and `ErrInvalidNetworkType`.
 - **No stale or mixed derivation state.** `ParsePath` updated the fields
   of the path it was given: re-parsing a 4-level ZIP-32 path with a 3-level
   one kept the old index (`m/32'/133'/1'` read back as `m/32'/133'/1'/5`),

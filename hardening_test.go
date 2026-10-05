@@ -286,3 +286,20 @@ func TestZIP32HasNoNetwork(t *testing.T) {
 		}
 	}
 }
+
+// TestFromStringHelpersWrapSentinels: every lookup helper reports an unknown
+// value with the sentinel of its component, as doc.go promises.
+func TestFromStringHelpersWrapSentinels(t *testing.T) {
+	if _, err := AlgorithmFromString("rsa"); !errors.Is(err, ErrInvalidAlgorithm) {
+		t.Errorf("AlgorithmFromString: got %v, want ErrInvalidAlgorithm", err)
+	}
+	if _, err := FormatFromString("zzz"); !errors.Is(err, ErrInvalidFormat) {
+		t.Errorf("FormatFromString: got %v, want ErrInvalidFormat", err)
+	}
+	if _, err := NetworkTypeFromString("doge"); !errors.Is(err, ErrInvalidNetworkType) {
+		t.Errorf("NetworkTypeFromString: got %v, want ErrInvalidNetworkType", err)
+	}
+	if _, err := DerivationTypeFromString("bip99"); !errors.Is(err, ErrInvalidDerivationType) {
+		t.Errorf("DerivationTypeFromString: got %v, want ErrInvalidDerivationType", err)
+	}
+}

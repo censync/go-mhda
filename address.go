@@ -1,7 +1,7 @@
 package go_mhda
 
 import (
-	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -84,7 +84,7 @@ func (a Algorithm) String() string { return string(a) }
 func AlgorithmFromString(src string) (Algorithm, error) {
 	a := Algorithm(normalize(src))
 	if !a.IsValid() {
-		return "", errors.New("undefined algorithm")
+		return "", fmt.Errorf("%w: %q", ErrInvalidAlgorithm, src)
 	}
 	return a, nil
 }
@@ -100,7 +100,7 @@ func (f Format) String() string { return string(f) }
 func FormatFromString(src string) (Format, error) {
 	f := Format(normalize(src))
 	if !f.IsValid() {
-		return "", errors.New("undefined format")
+		return "", fmt.Errorf("%w: %q", ErrInvalidFormat, src)
 	}
 	return f, nil
 }
