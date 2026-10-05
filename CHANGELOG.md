@@ -7,8 +7,9 @@ Releases before 1.2.0 are described by their tags and commit messages.
 
 ## [1.2.0] — 2026-10-05
 
-URNs accepted by 1.1 are refused now: a derivation path with a level index
-of 2^31 or more no longer parses.
+URNs and values accepted by 1.1 are refused now: see Changed. Code that
+builds addresses gets stricter constructors and setters, and
+`Chain.SetNetworkType` / `Chain.SetChainId` return an error.
 
 ### Changed
 
@@ -72,16 +73,6 @@ of 2^31 or more no longer parses.
 - **A `slip10` path has at most 255 levels**; a deeper one is refused with
   `ErrInvalidDerivationPath`. BIP-32 serialises a key's depth in one byte,
   so no wallet can represent a deeper key.
-
-### Documentation
-
-- SPEC.md states that an explicit `dt:root` is folded away (root is the
-  default and has no path, so a root address has one canonical form and
-  one hash); the Algorand and TON notes no longer call `dt:root` the
-  canonical form. It also lists ZIP-32 as a known limitation: `zip32`
-  parses, but no network registers it, so strict parsing refuses it. Both
-  behaviours are unchanged and now pinned by tests.
-
 - **Strict validation refuses curve, purpose and format combinations no
   wallet can derive.** It checked the algorithm, the format and the
   derivation type each on its own, so it accepted SLIP-10 ed25519 paths
@@ -98,9 +89,54 @@ of 2^31 or more no longer parses.
   or bech32, `bip86` p2tr or bech32m); and Cosmos `bip44` with coin
   `118'`. A Bitcoin URN without `af` stays valid; SPEC.md no longer claims
   strict mode requires it. Lenient parsing is unchanged.
+- **No whitespace inside the NSS.** Each value was trimmed, so
+  `urn:mhda:nt:evm:ci: 1 :dt: bip44 :...` parsed like the URN without the
+  spaces, against SPEC §6.1. ASCII whitespace is now trimmed only around the
+  whole URN, around an NSS or chain key parsed on its own, and before a
+  stripped r/q/f component (`ci:0 #frag` still parses); around a key or
+  value it is refused with `ErrInvalidNSS`.
+- **NSS bytes follow RFC 3986.** Keys and values accepted any printable
+  ASCII, so `"`, `<`, `>`, `\`, `^`, `` ` ``, `{`, `|`, `}`, `[`, `]` and a
+  raw `%` passed and were emitted in URNs that RFC 8141 does not allow. A
+  key or value is now made of letters, digits and `-._~!$&'()*+,;=@/`
+  only (RFC 3986 pchar and `/`, without `:` and `%`); anything else is
+  `ErrInvalidNSS` when parsed and `ErrInvalidValue` from the setters and
+  `NewChain`. `%` is refused because percent-encoding is not supported and
+  `%41` would be a second spelling of `A`.
 
 ### Fixed
 
+- **`ChargeType` is 32 bits wide (was `uint8`).** The CIP-11 charge and the
+  CIP-1852 role accept any level index, but the parsed value was truncated
+  to a byte: `m/1852'/1815'/0'/256/0` parsed as role 0, so it named the
+  role-0 key, re-serialised as `m/1852'/1815'/0'/0/0`, and `Levels()`
+  returned the truncated value. The full value is now kept in `Charge()`,
+  `Levels()` and `String()`. Code that converts `Charge()` to `uint8` must
+  widen its own variable.
+- **No stale or mixed derivation state.** `ParsePath` updated the fields
+  of the path it was given: re-parsing a 4-level ZIP-32 path with a 3-level
+  one kept the old index (`m/32'/133'/1'` read back as `m/32'/133'/1'/5`),
+  a SLIP-10 path kept the coin, account and charge of a BIP-44 path parsed
+  before it, and an error midway left a half-updated path.
+  `SetDerivationType` changed the type and kept the old path, so a bip44
+  address switched to zip32 serialised as `dt:zip32:dp:m/32'/133'/3'/9`, a
+  valid URN naming a key nobody gave. `ParsePath` now replaces the whole
+  path or nothing. A new derivation type drops the old path; until a path
+  is set the URN carries `dt` without `dp` (and does not parse), and
+  `Validate` / `MarshalText` return `ErrInvalidDerivationPath`. The new
+  `Address.SetDerivation(dt, dp)` sets both at once and changes nothing on
+  error; the URN parser uses it.
+- **`Levels()` and `String()` cannot disagree.** `NewDerivationPathFromLevels`
+  kept any levels it was given while `String()` printed the type's
+  template: a BIP-44 path built from `49'/60'/0/0/0` printed
+  `m/44'/60'/0'/0/0` but returned purpose 49' and an unhardened account from
+  `Levels()`, and too few levels or an index of 2^31 produced a URN that
+  does not parse. Both constructors now return exactly the path the parser
+  gives back for `String()`, and panic with `ErrInvalidDerivationPath`
+  otherwise. `Levels()` returned the internal slice, so a caller that
+  changed it changed the path; it returns a copy. `NewAddress` stored the
+  caller's chain and path, so two addresses built from them changed
+  together; it keeps copies.
 - **No nil dereference on a zero or partial `Address`.** `String()`,
   `NSS()`, the hashes, `Algorithm()` and `Format()` panicked on the zero
   `Address` or one built with a nil chain, and `SetDerivationPath` panicked
@@ -127,48 +163,15 @@ of 2^31 or more no longer parses.
   derivation type, path, format or coin type were trimmed, while the URN
   parser and the C++ port refuse the same bytes. They now trim ASCII
   whitespace and fold ASCII case only.
-- **No whitespace inside the NSS.** Each value was trimmed, so
-  `urn:mhda:nt:evm:ci: 1 :dt: bip44 :...` parsed like the URN without the
-  spaces, against SPEC §6.1. ASCII whitespace is now trimmed only around the
-  whole URN, around an NSS or chain key parsed on its own, and before a
-  stripped r/q/f component (`ci:0 #frag` still parses); around a key or
-  value it is refused with `ErrInvalidNSS`.
-- **NSS bytes follow RFC 3986.** Keys and values accepted any printable
-  ASCII, so `"`, `<`, `>`, `\`, `^`, `` ` ``, `{`, `|`, `}`, `[`, `]` and a
-  raw `%` passed and were emitted in URNs that RFC 8141 does not allow. A
-  key or value is now made of letters, digits and `-._~!$&'()*+,;=@/`
-  only (RFC 3986 pchar and `/`, without `:` and `%`); anything else is
-  `ErrInvalidNSS` when parsed and `ErrInvalidValue` from the setters and
-  `NewChain`. `%` is refused because percent-encoding is not supported and
-  `%41` would be a second spelling of `A`.
-- **No stale or mixed derivation state.** `ParsePath` updated the fields
-  of the path it was given: re-parsing a 4-level ZIP-32 path with a 3-level
-  one kept the old index (`m/32'/133'/1'` read back as `m/32'/133'/1'/5`),
-  a SLIP-10 path kept the coin, account and charge of a BIP-44 path parsed
-  before it, and an error midway left a half-updated path.
-  `SetDerivationType` changed the type and kept the old path, so a bip44
-  address switched to zip32 serialised as `dt:zip32:dp:m/32'/133'/3'/9`, a
-  valid URN naming a key nobody gave. `ParsePath` now replaces the whole
-  path or nothing. A new derivation type drops the old path; until a path
-  is set the URN carries `dt` without `dp` (and does not parse), and
-  `Validate` / `MarshalText` return `ErrInvalidDerivationPath`. The new
-  `Address.SetDerivation(dt, dp)` sets both at once and changes nothing on
-  error; the URN parser uses it.
-- **`Levels()` and `String()` cannot disagree.** `NewDerivationPathFromLevels`
-  kept any levels it was given while `String()` printed the type's
-  template: a BIP-44 path built from `49'/60'/0/0/0` printed
-  `m/44'/60'/0'/0/0` but returned purpose 49' and an unhardened account from
-  `Levels()`, and too few levels or an index of 2^31 produced a URN that
-  does not parse. Both constructors now return exactly the path the parser
-  gives back for `String()`, and panic with `ErrInvalidDerivationPath`
-  otherwise. `Levels()` returned the internal slice, so a caller that
-  changed it changed the path; it returns a copy. `NewAddress` stored the
-  caller's chain and path, so two addresses built from them changed
-  together; it keeps copies.
-- **`ChargeType` is 32 bits wide (was `uint8`).** The CIP-11 charge and the
-  CIP-1852 role accept any level index, but the parsed value was truncated
-  to a byte: `m/1852'/1815'/0'/256/0` parsed as role 0, so it named the
-  role-0 key, re-serialised as `m/1852'/1815'/0'/0/0`, and `Levels()`
-  returned the truncated value. The full value is now kept in `Charge()`,
-  `Levels()` and `String()`. Code that converts `Charge()` to `uint8` must
-  widen its own variable.
+
+### Documentation
+
+- SPEC.md states that an explicit `dt:root` is folded away (root is the
+  default and has no path, so a root address has one canonical form and
+  one hash); the Algorand and TON notes no longer call `dt:root` the
+  canonical form. It also lists ZIP-32 as a known limitation: `zip32`
+  parses, but no network registers it, so strict parsing refuses it. Both
+  behaviours are unchanged and now pinned by tests.
+- SPEC.md notes that an EVM chain id is opaque: `ci:1`, `ci:0x1` and
+  `ci:01` are three chain keys for one chain, and a producer must keep to
+  one spelling.
