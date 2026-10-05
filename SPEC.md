@@ -290,6 +290,14 @@ Regardless of derivation type, the canonical level-by-level view is exposed
 via `DerivationPath.Levels()`. For BIP-family schemes the BIP-44 shortcut
 fields (`Coin`, `Account`, `Charge`, `AddressIndex`) are also populated.
 
+`Levels()` and `String()` always describe the same path. A path built in code
+(`NewDerivationPath`, `NewDerivationPathFromLevels`) must be one the parser
+would produce from its own `String()`: levels that do not fit the type (a
+BIP-44 path with purpose `49'`, an unhardened account, too few levels, a
+SLIP-10 path with none) or an index of 2^31 or more panic with
+`ErrInvalidDerivationPath`. `Levels()` returns a copy, and `NewAddress` keeps
+its own copies of the chain and the path it is given.
+
 ## 4. Algorithms
 
 | `aa`        | Notes                                                                  |

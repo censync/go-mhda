@@ -135,3 +135,110 @@ func TestSetDerivationIsAtomic(t *testing.T) {
 		t.Errorf("root: String() = %q", got)
 	}
 }
+
+// TestConstructorsMakeParseablePaths: a constructed path is exactly what
+// parsing its String() gives back, so Levels() and the URN cannot disagree.
+// Anything else panics with ErrInvalidDerivationPath.
+func TestConstructorsMakeParseablePaths(t *testing.T) {
+	for name, f := range map[string]func(){
+		"bip44 purpose 49": func() {
+			NewDerivationPathFromLevels(BIP44, []AddressIndex{{49, true}, {60, true}, {0, true}, {0, false}, {0, false}})
+		},
+		"bip44 soft account": func() {
+			NewDerivationPathFromLevels(BIP44, []AddressIndex{{44, true}, {60, true}, {0, false}, {0, false}, {0, false}})
+		},
+		"bip44 two levels":       func() { NewDerivationPathFromLevels(BIP44, []AddressIndex{{44, true}, {60, true}}) },
+		"slip10 no levels":       func() { NewDerivationPathFromLevels(SLIP10, nil) },
+		"slip10 index 2^31":      func() { NewDerivationPathFromLevels(SLIP10, []AddressIndex{{1 << 31, false}}) },
+		"root with a level":      func() { NewDerivationPathFromLevels(ROOT, []AddressIndex{{0, true}}) },
+		"bip44 account 2^31":     func() { NewDerivationPath(BIP44, 60, 1<<31, 0, AddressIndex{}) },
+		"bip44 charge 7":         func() { NewDerivationPath(BIP44, 60, 0, 7, AddressIndex{}) },
+		"bip32 index 4294967295": func() { NewDerivationPath(BIP32, 0, 0, 0, AddressIndex{Index: 4294967295}) },
+	} {
+		if err := panicErr(t, f); !errors.Is(err, ErrInvalidDerivationPath) {
+			t.Errorf("%s: panic %v, want ErrInvalidDerivationPath", name, err)
+		}
+	}
+
+	dp := NewDerivationPathFromLevels(BIP44, []AddressIndex{{44, true}, {60, true}, {0, true}, {0, false}, {5, false}})
+	if got := dp.String(); got != "m/44'/60'/0'/0/5" {
+		t.Errorf("String() = %q", got)
+	}
+	parsed, err := ParseDerivationPath(BIP44, "m/44'/60'/0'/0/5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !samePath(dp, parsed) {
+		t.Errorf("constructed path %+v differs from the parsed one %+v", *dp, *parsed)
+	}
+	// BIP-32 has no coin level: the constructor drops the coin like the parser.
+	if c := NewDerivationPath(BIP32, 60, 0, 0, AddressIndex{}).Coin(); c != 0 {
+		t.Errorf("BIP-32 path keeps coin %d", c)
+	}
+}
+
+// TestLevelsReturnsACopy: the caller cannot change a path through Levels().
+func TestLevelsReturnsACopy(t *testing.T) {
+	for dt, p := range map[DerivationType]string{SLIP10: "m/44'/501'/0'/0'", BIP44: "m/44'/60'/0'/0/0"} {
+		dp, err := ParseDerivationPath(dt, p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lv := dp.Levels()
+		lv[2].Index = 9
+		lv[2].IsHardened = false
+		if got := dp.String(); got != p {
+			t.Errorf("%s: String() = %q after changing a copy", dt, got)
+		}
+		if got := dp.Levels()[2]; got != (AddressIndex{Index: 0, IsHardened: true}) {
+			t.Errorf("%s: Levels()[2] = %+v after changing a copy", dt, got)
+		}
+	}
+}
+
+// TestNewAddressCopiesChainAndPath: two addresses built from one chain and
+// one path are independent of each other and of the originals.
+func TestNewAddressCopiesChainAndPath(t *testing.T) {
+	p, err := ParseDerivationPath(BIP44, "m/44'/60'/0'/0/0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := NewChain(EthereumVM, "1")
+	x := NewAddress(c, p)
+	y := NewAddress(c, p)
+	if err := x.SetDerivationPath("m/44'/60'/0'/0/9"); err != nil {
+		t.Fatal(err)
+	}
+	if err := x.SetCoinType("60"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.SetChainId("56"); err != nil {
+		t.Fatal(err)
+	}
+	const want = `urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0`
+	if got := y.String(); got != want {
+		t.Errorf("y changed with x or c: %q, want %q", got, want)
+	}
+	if got := p.String(); got != "m/44'/60'/0'/0/0" {
+		t.Errorf("the original path changed: %q", got)
+	}
+	if got := x.String(); got != `urn:mhda:nt:evm:ci:1:ct:60:dt:bip44:dp:m/44'/60'/0'/0/9` {
+		t.Errorf("x: %q", got)
+	}
+}
+
+// samePath compares two paths through their public view.
+func samePath(a, b *DerivationPath) bool {
+	la, lb := a.Levels(), b.Levels()
+	if len(la) != len(lb) {
+		return false
+	}
+	for i := range la {
+		if la[i] != lb[i] {
+			return false
+		}
+	}
+	return a.DerivationType() == b.DerivationType() && a.String() == b.String() &&
+		a.Coin() == b.Coin() && a.Account() == b.Account() && a.Charge() == b.Charge() &&
+		a.AddressIndex() == b.AddressIndex()
+}

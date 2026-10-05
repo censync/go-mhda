@@ -113,7 +113,7 @@ func NewDerivationPath(derivationType DerivationType, coin CoinType, account Acc
 		hasIndex:       derivationType != ROOT,
 	}
 	dp.rebuildLevels()
-	return dp
+	return reparsed(dp, dp.levels)
 }
 
 // NewDerivationPathFromLevels constructs a path from an explicit sequence of
@@ -135,7 +135,38 @@ func NewDerivationPathFromLevels(derivationType DerivationType, levels []Address
 		levels:         cp,
 	}
 	dp.populateShortcutsFromLevels()
-	return dp
+	return reparsed(dp, cp)
+}
+
+// reparsed returns the path parsed back from dp.String() and panics with
+// ErrInvalidDerivationPath unless it has exactly the given levels. A
+// constructed path is then identical to a parsed one: its URN parses, and
+// Levels() never disagrees with String() (a BIP-44 path given purpose 49', an
+// unhardened account, too few levels or an index of 2^31 is refused).
+func reparsed(dp *DerivationPath, levels []AddressIndex) *DerivationPath {
+	out := &DerivationPath{derivationType: dp.derivationType}
+	if err := out.parse(dp.String()); err != nil {
+		panic(err)
+	}
+	if len(out.levels) != len(levels) {
+		panic(fmt.Errorf("%w: levels %v do not form a %s path", ErrInvalidDerivationPath, levels, dp.derivationType))
+	}
+	for i := range levels {
+		if out.levels[i] != levels[i] {
+			panic(fmt.Errorf("%w: levels %v do not form a %s path", ErrInvalidDerivationPath, levels, dp.derivationType))
+		}
+	}
+	return out
+}
+
+// clone returns a copy that shares no memory with dp.
+func (dp *DerivationPath) clone() *DerivationPath {
+	if dp == nil {
+		return nil
+	}
+	c := *dp
+	c.levels = append([]AddressIndex(nil), dp.levels...)
+	return &c
 }
 
 // populateShortcutsFromLevels fills the BIP-44-style shortcut fields from
@@ -546,9 +577,9 @@ func (dp *DerivationPath) rebuildLevels() {
 }
 
 // Levels returns the canonical level-by-level view of the derivation path.
-// Empty for ROOT.
+// Empty for ROOT. The slice is a copy: changing it does not change the path.
 func (dp *DerivationPath) Levels() []AddressIndex {
-	return dp.levels
+	return append([]AddressIndex(nil), dp.levels...)
 }
 
 // String returns the canonical textual form of the derivation path.

@@ -54,8 +54,11 @@ type Address struct {
 // exactly like parsed input; an invalid value panics (programmer error at a
 // construction site — mirroring the NewDerivationPath precedent). The parse
 // entry points never panic.
+//
+// The address keeps its own copies of chain and path: changing them later,
+// or another address built from them, does not change this one.
 func NewAddress(chain *Chain, path *DerivationPath, params ...string) *Address {
-	a := &Address{chain: chain, path: path}
+	a := &Address{chain: chain.clone(), path: path.clone()}
 	get := func(i int) string {
 		if i < len(params) {
 			return params[i]

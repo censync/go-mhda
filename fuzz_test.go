@@ -58,6 +58,11 @@ func FuzzParseURN(f *testing.F) {
 		if again.String() != serialized {
 			t.Fatalf("not idempotent:\n once:  %s\n twice: %s\n input: %q", serialized, again.String(), src)
 		}
+		// The levels a wallet derives from must survive the round trip.
+		if !samePath(addr.DerivationPath(), again.DerivationPath()) {
+			t.Fatalf("path changed on re-parse: %v -> %v (input: %q)",
+				addr.DerivationPath().Levels(), again.DerivationPath().Levels(), src)
+		}
 	})
 }
 
@@ -124,6 +129,11 @@ func FuzzDerivationPath(f *testing.F) {
 		if dp2.String() != serialized {
 			t.Fatalf("not idempotent:\n once:  %s\n twice: %s\n input: dt=%q path=%q",
 				serialized, dp2.String(), dt, path)
+		}
+
+		// String() and Levels() describe the same path.
+		if !samePath(dp, dp2) {
+			t.Fatalf("path changed on re-parse: %v -> %v (input: dt=%q path=%q)", dp.Levels(), dp2.Levels(), dt, path)
 		}
 
 		// No accepted level may carry an index of 2^31 or more.

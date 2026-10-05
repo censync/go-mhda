@@ -151,6 +151,15 @@ func parseCoinType(s string) (CoinType, error) {
 	return CoinType(v), nil
 }
 
+// clone returns a copy of c.
+func (c *Chain) clone() *Chain {
+	if c == nil {
+		return nil
+	}
+	cp := *c
+	return &cp
+}
+
 // SetNetworkType sets the network type. It must be one of the registered
 // constants (ErrInvalidNetworkType); on error the chain is left unchanged.
 func (c *Chain) SetNetworkType(networkType NetworkType) error {

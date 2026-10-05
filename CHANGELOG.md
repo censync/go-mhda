@@ -97,6 +97,17 @@ of 2^31 or more no longer parses.
   `Validate` / `MarshalText` return `ErrInvalidDerivationPath`. The new
   `Address.SetDerivation(dt, dp)` sets both at once and changes nothing on
   error; the URN parser uses it.
+- **`Levels()` and `String()` cannot disagree.** `NewDerivationPathFromLevels`
+  kept any levels it was given while `String()` printed the type's
+  template: a BIP-44 path built from `49'/60'/0/0/0` printed
+  `m/44'/60'/0'/0/0` but returned purpose 49' and an unhardened account from
+  `Levels()`, and too few levels or an index of 2^31 produced a URN that
+  does not parse. Both constructors now return exactly the path the parser
+  gives back for `String()`, and panic with `ErrInvalidDerivationPath`
+  otherwise. `Levels()` returned the internal slice, so a caller that
+  changed it changed the path; it returns a copy. `NewAddress` stored the
+  caller's chain and path, so two addresses built from them changed
+  together; it keeps copies.
 - **`ChargeType` is 32 bits wide (was `uint8`).** The CIP-11 charge and the
   CIP-1852 role accept any level index, but the parsed value was truncated
   to a byte: `m/1852'/1815'/0'/256/0` parsed as role 0, so it named the
