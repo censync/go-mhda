@@ -53,6 +53,15 @@ of 2^31 or more no longer parses.
   `urn:mhda:nt:evm:ci:1`, naming the root key instead of the path they
   spell out. `Address.SetDerivationPath` on a root address accepts only an
   empty path.
+- **The NSS is parsed strictly as `key:value` pairs.** An unknown key was
+  skipped as a single token, so its value was read as the next key and a
+  key with the wrong case vanished: `...:ci:1:DT:bip44:DP:m/44'/60'/0'/0/5`
+  parsed as the root address `urn:mhda:nt:evm:ci:1`, and
+  `...:ci:1:ext:wi:dt:bip44:...` read `dt` as the wallet id. An unknown
+  component is now skipped together with its value; a key that differs from
+  a known key only by case, a dangling token, a trailing `:` and an empty
+  key are refused with `ErrInvalidNSS`. `ChainFromKey` reports a dangling
+  token as `ErrInvalidChainKey`, as before.
 
 ### Fixed
 

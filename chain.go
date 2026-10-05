@@ -54,6 +54,11 @@ func NewChain(networkType NetworkType, chainId ChainId) *Chain {
 // input must BE the canonical string.
 func ChainFromKey(chainKey ChainKey) (*Chain, error) {
 	trimmed := asciiTrim(string(chainKey))
+	// A dangling token is residue like any other: the input is not the
+	// canonical key, whatever else it carries.
+	if trimmed != "" && strings.Count(trimmed, ":")%2 == 0 {
+		return nil, fmt.Errorf("%w: not a sequence of key:value pairs: %q", ErrInvalidChainKey, trimmed)
+	}
 	components, err := parseNSS(trimmed)
 	if err != nil {
 		return nil, err

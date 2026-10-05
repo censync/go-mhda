@@ -19,7 +19,16 @@ urn:mhda:nt:<network>:ci:<chain_id>:ct:<slip44>:dt:<derivation>:dp:<path>:aa:<al
 
 The `urn:` and the NID `mhda` are case-insensitive (RFC 8141 §5.1). Component
 keys (`nt`, `dt`, etc.) are lowercase by convention and are accepted only in
-that form. Enum-valued components (`nt`, `dt`, `aa`, `af`) normalise to
+that form: a key that differs from a known key only by case (`DT`, `Wi`) is
+refused with `ErrInvalidNSS`, never skipped.
+
+The NSS is a sequence of `key:value` pairs. A pair whose key is not one of
+the components below is skipped together with its value, for forward
+compatibility with future components; a value is therefore never read as a
+key. A key without a value (a dangling token, a trailing `:`), an empty key
+or value, and a repeated known key are refused with `ErrInvalidNSS`.
+
+Enum-valued components (`nt`, `dt`, `aa`, `af`) normalise to
 lowercase in the canonical form; free-form values (`ci`, `ap`, `as`, `wt`,
 `wi`) are case-preserving and round-trip verbatim.
 

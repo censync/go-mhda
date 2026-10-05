@@ -26,3 +26,24 @@ refuse urn invalid_derivation_path urn:mhda:nt:evm:ci:1:dt:bip44
 accept urn urn:mhda:nt:ton:ci:mainnet urn:mhda:nt:ton:ci:mainnet
 accept urn urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0 urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0
 accept nss nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0 urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0
+
+# The NSS is a sequence of key:value pairs. An unknown key is skipped
+# together with its value (forward compatibility), so a following known key
+# is never read as its value. A key that differs from a known key only by
+# case is refused rather than skipped, and so is a token without a value.
+refuse urn invalid_nss urn:mhda:nt:evm:ci:1:DT:bip44:DP:m/44'/60'/0'/0/5
+refuse urn invalid_nss urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0:WI:wallet-A
+refuse urn invalid_nss urn:mhda:NT:evm:ci:1
+refuse urn invalid_nss urn:mhda:nt:evm:Ci:1
+accept urn urn:mhda:nt:evm:ci:1:ext:wi:dt:bip44:dp:m/44'/60'/0'/0/5 urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/5
+accept urn urn:mhda:nt:evm:ci:1:xx:future urn:mhda:nt:evm:ci:1
+accept urn urn:mhda:xx:nt:nt:evm:ci:1 urn:mhda:nt:evm:ci:1
+refuse urn invalid_nss urn:mhda:nt:evm:ci:1:garbage
+refuse urn invalid_nss urn:mhda:nt:evm:junk:ci:1
+refuse urn invalid_nss urn:mhda:nt:evm:ci:1:
+refuse urn invalid_nss urn:mhda::nt:evm:ci:1
+refuse urn invalid_nss urn:mhda:nt:evm:ci:1::x
+refuse urn invalid_nss urn:mhda:nt:evm:ci:1:xx:
+refuse urn missing_network_type urn:mhda:
+refuse nss invalid_nss nt:evm:ci:1:foo
+accept nss nt:evm:ci:1:wt:web3 urn:mhda:nt:evm:ci:1:wt:web3

@@ -103,6 +103,20 @@ func validateValueCharset(key, value string) error {
 	return nil
 }
 
+// validateKeyCharset requires a component key to be non-empty printable
+// ASCII, the same byte range as values.
+func validateKeyCharset(key string) error {
+	if key == "" {
+		return fmt.Errorf("%w: empty component key", ErrInvalidNSS)
+	}
+	for i := 0; i < len(key); i++ {
+		if key[i] < 0x21 || key[i] > 0x7e {
+			return fmt.Errorf("%w: non-ASCII or control byte in component key %q", ErrInvalidNSS, key)
+		}
+	}
+	return nil
+}
+
 // stripRQF strips the optional rq-components ("?+" / "?=") and f-component
 // ("#") trailing the assigned-name part, per RFC 8141 §2. The current parser
 // does not interpret resource/query/fragment metadata; they are silently
@@ -157,27 +171,31 @@ func ParseNSS(nss string) (MHDA, error) {
 // parseNSS is the shared low-level NSS parser. It returns the raw component
 // map; callers (ParseNSS, ChainFromNSS) interpret the map per their domain.
 //
-// Form: a sequence of `key:value` pairs joined by `:` separators. Unknown
-// keys are silently skipped (forward-compat with future URN extensions);
-// duplicate keys and empty values are rejected.
+// Form: a sequence of `key:value` pairs joined by `:` separators; an empty
+// NSS has no components. A pair with an unknown key is skipped together with
+// its value (forward-compat with future URN extensions), so a value is never
+// read as a key and a following known key is never read as a value. A key
+// that differs from a known key only by case is rejected, not skipped: it
+// would drop the component silently. A key without a value, an empty key or
+// value and a duplicate known key are rejected too.
 //
 // Values may not contain ':'; this holds for every component currently
 // defined in MHDA. Adding a value type that needs ':' would require
 // percent-encoding support.
 func parseNSS(nss string) (map[string]string, error) {
-	parts := strings.Split(nss, ":")
 	components := make(map[string]string, len(componentsNames))
+	if nss == "" {
+		return components, nil
+	}
+	parts := strings.Split(nss, ":")
+	if len(parts)%2 != 0 {
+		return nil, fmt.Errorf("%w: missing value for %q", ErrInvalidNSS, parts[len(parts)-1])
+	}
 
-	for i := 0; i < len(parts); {
+	for i := 0; i < len(parts); i += 2 {
 		key := parts[i]
-		if _, ok := knownComponents[key]; !ok {
-			// Unknown token (could be an unrelated word, a future component
-			// name, or part of a value we mis-identified). Skip and move on.
-			i++
-			continue
-		}
-		if i+1 >= len(parts) {
-			return nil, fmt.Errorf("%w: missing value for %q", ErrInvalidNSS, key)
+		if err := validateKeyCharset(key); err != nil {
+			return nil, err
 		}
 		// RFC 8141 NSS does not permit unescaped whitespace; trim ASCII
 		// whitespace so any trailing space (e.g. from "ci:0 #frag" where
@@ -193,11 +211,16 @@ func parseNSS(nss string) (map[string]string, error) {
 		if err := validateValueCharset(key, value); err != nil {
 			return nil, err
 		}
+		if _, ok := knownComponents[key]; !ok {
+			if _, ok := knownComponents[strings.ToLower(key)]; ok {
+				return nil, fmt.Errorf("%w: component key %q must be lowercase", ErrInvalidNSS, key)
+			}
+			continue // unknown component, skipped with its value
+		}
 		if _, dup := components[key]; dup {
 			return nil, fmt.Errorf("%w: duplicate component %q", ErrInvalidNSS, key)
 		}
 		components[key] = value
-		i += 2
 	}
 	return components, nil
 }
