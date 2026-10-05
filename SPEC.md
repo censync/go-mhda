@@ -250,7 +250,7 @@ protocol messages.
 | bip74    | `m/74'/coin'/account'/charge/index[']`                | 5       | sui-keys/src/key_derive.rs (Sui secp256r1)                             |
 | bip84    | `m/84'/coin'/account'/charge/index[']`                | 5       | https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki         |
 | bip86    | `m/86'/coin'/account'/charge/index[']`                | 5       | https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki         |
-| slip10   | `m(/index['])+`  (variable length)                    | 1+      | https://github.com/satoshilabs/slips/blob/master/slip-0010.md          |
+| slip10   | `m(/index['])+`  (variable length)                    | 1-255   | https://github.com/satoshilabs/slips/blob/master/slip-0010.md          |
 | cip11    | `m/44'/118'/account'/charge_extra/index[']`           | 5       | https://github.com/confio/cosmos-hd-key-derivation-spec                |
 | cip1852  | `m/1852'/1815'/account'/role/index[']`                | 5       | https://github.com/cardano-foundation/CIPs/blob/master/CIP-1852/       |
 | zip32    | `m/32'/133'/account'[/index[']]`                      | 3 or 4  | https://zips.z.cash/zip-0032                                           |
@@ -272,9 +272,11 @@ exactly as in the template.
 
 ### 3.1 Variable-length paths
 
-`slip10` accepts any number of levels and is the right type for chains whose
+`slip10` accepts 1 to 255 levels and is the right type for chains whose
 HD derivation does not fit a fixed shape (Solana, Stellar, Aptos ed25519,
-Sui ed25519, NEAR, Ledger TON).
+Sui ed25519, NEAR, Ledger TON). The upper bound is BIP-32's: a key's depth
+is serialised in one byte, so a deeper path is refused with
+`ErrInvalidDerivationPath`.
 
 `zip32` accepts both 3-level (`m/32'/133'/account'`) and 4-level
 (`m/32'/133'/account'/index[']`) forms; both round-trip exactly.

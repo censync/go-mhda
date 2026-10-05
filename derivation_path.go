@@ -59,6 +59,10 @@ func DerivationTypeFromString(src string) (DerivationType, error) {
 
 type AccountIndex uint32
 
+// maxSlip10Depth is the deepest SLIP-10 path: BIP-32 serialises a key's depth
+// in one byte.
+const maxSlip10Depth = 255
+
 // ChargeType is the level after the account: the change level of BIP-32 and
 // the BIP-44 family (0 external, 1 internal), the CIP-11 charge and the
 // CIP-1852 role. It is as wide as a level index: the CIP-11 charge and the
@@ -402,6 +406,9 @@ func (dp *DerivationPath) ParsePath(path string) error {
 		// Generic SLIP-0010: split the path manually to extract per-level
 		// index and hardening marker. The regex above only validates shape.
 		segments := strings.Split(path[2:], "/") // skip leading "m/"
+		if len(segments) > maxSlip10Depth {
+			return fmt.Errorf("%w: %d levels, at most %d", ErrInvalidDerivationPath, len(segments), maxSlip10Depth)
+		}
 		levels := make([]AddressIndex, 0, len(segments))
 		for i, seg := range segments {
 			hardened := false

@@ -69,6 +69,9 @@ of 2^31 or more no longer parses.
   address whose URN re-parsed as the root address `urn:mhda:nt:evm:ci:1`,
   and `ChainFromKey("nt:evm:ci:1#a")` was accepted. `FuzzParseNSS` now
   checks that the emitted URN re-parses to itself.
+- **A `slip10` path has at most 255 levels**; a deeper one is refused with
+  `ErrInvalidDerivationPath`. BIP-32 serialises a key's depth in one byte,
+  so no wallet can represent a deeper key.
 
 ### Fixed
 
