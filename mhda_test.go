@@ -1755,6 +1755,57 @@ func TestHashFunctions(t *testing.T) {
 	}
 }
 
+// TestHashReferenceVectors pins the four digests at the SHA-1/SHA-256 block
+// and padding boundaries: str() of 55, 56, 63, 64, 119, 120, 128 and 1000
+// bytes (the NSS is 9 bytes shorter, so it covers 55 too). The values were
+// computed with Python's hashlib and are shared with the C++ port, whose
+// hashes are hand-written.
+func TestHashReferenceVectors(t *testing.T) {
+	cases := []struct {
+		size                               int
+		hash, hash256, nssHash, nssHash256 string
+	}{
+		{55, "7230ec9cac1176541d5e454a5977547849806ef3", "4bcf74edcd630246d1cb1f03be5dc2deb7cc850270a2d3f279d68166778e2065",
+			"3c1704aa5f179b7d21a9f726e20473ac2b5786e1", "c85613e0a6562581d353224545cbebc3710ddb496d4b03baddd435fa311b7bbb"},
+		{56, "7c08382a5672e118ef014b54c8d1b42e7b6cb90b", "a176aa8ff4ccdcb7b05e3e39440cc40b8b17219910f3081c062045abbf331255",
+			"8f17a0079072eb355e316ebdbb73aa4328762ff7", "242f19fedc19e36ab9c4378b45922e731269ea04c325b58c4a90d4389ffce482"},
+		{63, "6b6034fd2e44f4ad8ea9da946a6915f017966ead", "0be4d717499d1b2a081c60cf64f0c59b5e09a1a0da1e65c497c83e839caef655",
+			"4b8360e09c0db0f1c423342d03db990ee4795695", "0bd7a04f6ca2b30eca17273961fa78db6f345e654ed80ac78a85d780d73d0267"},
+		{64, "c5b9fb4f88ee7f77e14566483838fe03eb5f722a", "be3e95721333ec68988eedb3b6c37c7c48ee30211c3bef96900609e8f1dd3546",
+			"fba8bdfdfb761ca75bc1a38886a7219cba376adc", "713ea1b363b46219865aded589c56341e7d0e63c9278e7e11ae154f05883d1c5"},
+		{119, "91f3a5706cdf32541f6c2d45ea4280399da43847", "d04d2a8a7f6df456cada8d263a746f0d21e4b600ef7bdcea4f6e645c17d94914",
+			"94285bd9afc8f49eb2059992f3660aee22e76063", "d3398acc7f987d3d3c90acd2e4ef958bd7053a8a88e4b2d51b5774b0fb03cfdc"},
+		{120, "8f7e2ab8a8a0c101e299154982f0e262bf43b7d0", "a4ed7ff3b82d6f7fa7a322ca72971a2b1e6474a5d08475599bc965282acb49c7",
+			"7eb1dc21b8685d3b9dbc9c2cbb9240acc90a2660", "aba04d6e4a96a9f662bb9ac433ba50f2c34d7991aee8cb2787ab91bc4228e88a"},
+		{128, "56e36e13d0581067945cd12955e3ce4b21967a48", "b6fb21cc83b07ab98648ec0b1bb04a3d79cd31d231cc07303d24ce73145a46ed",
+			"c792663db1797615b2433d56b96bf73d859a3e6f", "2c04bb624a604bd96c5b0e4b9e1006bbe898f134b60a40a1ed81d63e03897ea7"},
+		{1000, "f3acba196b25a975d6989beef6693337b5987f26", "7d57f53b9e4785b1735151906fd63ccb70547a8a2292986b613cf23db7b0f3d7",
+			"d16eb7a3991c6ace27d58b3e80e617567cfd242b", "2e7dd698a37e3fb7660b19bcad20b60677bd1e7f01d79870daa09a8a1f7269d8"},
+	}
+	for _, c := range cases {
+		urn := `urn:mhda:nt:evm:ci:` + strings.Repeat("x", c.size-19)
+		addr, err := ParseURN(urn)
+		if err != nil {
+			t.Fatalf("ParseURN(%d bytes): %v", c.size, err)
+		}
+		if got := len(addr.String()); got != c.size {
+			t.Fatalf("String() is %d bytes, want %d", got, c.size)
+		}
+		if got := addr.Hash(); got != c.hash {
+			t.Errorf("%d bytes: Hash() = %s, want %s", c.size, got, c.hash)
+		}
+		if got := addr.Hash256(); got != c.hash256 {
+			t.Errorf("%d bytes: Hash256() = %s, want %s", c.size, got, c.hash256)
+		}
+		if got := addr.NSSHash(); got != c.nssHash {
+			t.Errorf("%d bytes: NSSHash() = %s, want %s", c.size, got, c.nssHash)
+		}
+		if got := addr.NSSHash256(); got != c.nssHash256 {
+			t.Errorf("%d bytes: NSSHash256() = %s, want %s", c.size, got, c.nssHash256)
+		}
+	}
+}
+
 // TestSLIP10ProgrammaticConstruction ensures NewDerivationPathFromLevels for
 // SLIP-10 produces a path that round-trips through a full URN.
 func TestSLIP10ProgrammaticConstruction(t *testing.T) {
