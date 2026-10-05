@@ -86,9 +86,10 @@ func ChainFromKey(chainKey ChainKey) (*Chain, error) {
 
 // ChainFromNSS parses the chain-domain components ("nt", "ci" and the
 // optional "ct" metadata) from the given NSS string. Other components are
-// tolerated and ignored, so a full address NSS is valid input.
+// tolerated and ignored, so a full address NSS is valid input. Surrounding
+// ASCII whitespace is trimmed; whitespace inside the NSS is refused.
 func ChainFromNSS(src string) (*Chain, error) {
-	components, err := parseNSS(src)
+	components, err := parseNSS(asciiTrim(src))
 	if err != nil {
 		return nil, err
 	}

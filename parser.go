@@ -86,8 +86,11 @@ func hasPrefixFold(s, prefix string) bool {
 // check rejects it loudly. Trimming it instead (as a Unicode-aware trim
 // would) silently accepts a malformed URN and diverges from the C++ port.
 func asciiTrim(s string) string {
-	return strings.Trim(s, " \t\n\v\f\r")
+	return strings.Trim(s, asciiSpace)
 }
+
+// asciiSpace is the ASCII whitespace asciiTrim removes.
+const asciiSpace = " \t\n\v\f\r"
 
 // validateValueCharset enforces SPEC §1.5: NSS values consist of printable
 // ASCII only. Control characters, whitespace of any kind and non-ASCII bytes
@@ -136,7 +139,10 @@ func ParseURN(src string) (MHDA, error) {
 	if !hasPrefixFold(src, prefixMHDA) {
 		return nil, ErrInvalidURN
 	}
-	return ParseNSS(stripRQF(src[prefixOffset:]))
+	// Whitespace left before a stripped r/q/f component ("ci:0 #frag") ends
+	// the URN like the whitespace trimmed above; any other whitespace in the
+	// NSS is malformed and parseNSS refuses it.
+	return parseAddressNSS(strings.TrimRight(stripRQF(src[prefixOffset:]), asciiSpace))
 }
 
 // ParseURNStrict is ParseURN + Validate(). It rejects URNs whose
@@ -156,8 +162,15 @@ func ParseURNStrict(src string) (MHDA, error) {
 }
 
 // ParseNSS parses an MHDA namespace-specific string into an MHDA address.
-// Requires the network type ("nt") component to be present.
+// Requires the network type ("nt") component to be present. Surrounding ASCII
+// whitespace is trimmed; whitespace inside the NSS is refused.
 func ParseNSS(nss string) (MHDA, error) {
+	return parseAddressNSS(asciiTrim(nss))
+}
+
+// parseAddressNSS parses an NSS without surrounding whitespace into an
+// address.
+func parseAddressNSS(nss string) (MHDA, error) {
 	components, err := parseNSS(nss)
 	if err != nil {
 		return nil, err
@@ -177,7 +190,9 @@ func ParseNSS(nss string) (MHDA, error) {
 // read as a key and a following known key is never read as a value. A key
 // that differs from a known key only by case is rejected, not skipped: it
 // would drop the component silently. A key without a value, an empty key or
-// value and a duplicate known key are rejected too.
+// value and a duplicate known key are rejected too. Nothing is trimmed: the
+// caller removes whitespace around the whole NSS, and whitespace around a key
+// or value is malformed input.
 //
 // '?' and '#' open the RFC 8141 r/q/f components. ParseURN strips them before
 // the NSS reaches this parser; an NSS that still carries one (ParseNSS,
@@ -205,17 +220,12 @@ func parseNSS(nss string) (map[string]string, error) {
 		if err := validateKeyCharset(key); err != nil {
 			return nil, err
 		}
-		// RFC 8141 NSS does not permit unescaped whitespace; trim ASCII
-		// whitespace so any trailing space (e.g. from "ci:0 #frag" where
-		// stripRQF leaves the space) does not leak into the canonical form
-		// and break round-trip.
-		value := asciiTrim(parts[i+1])
+		value := parts[i+1]
 		if value == "" {
 			return nil, fmt.Errorf("%w: empty value for %q", ErrInvalidNSS, key)
 		}
-		// Everything that survives the trim must be printable ASCII —
-		// interior whitespace, control bytes and Unicode spaces are all
-		// malformed input, never silently normalised.
+		// A value is printable ASCII: whitespace, control bytes and Unicode
+		// spaces are malformed input, never silently normalised.
 		if err := validateValueCharset(key, value); err != nil {
 			return nil, err
 		}

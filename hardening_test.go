@@ -341,3 +341,43 @@ func TestNormalisationIsASCIIOnly(t *testing.T) {
 		t.Errorf("SetDerivation with ASCII case and spaces: %v", err)
 	}
 }
+
+// TestNoWhitespaceInsideNSS: ASCII whitespace is trimmed around the whole
+// URN (and around an NSS or chain key given on its own, and before an r/q/f
+// component), never around a key or value inside it; there it is malformed
+// input, as SPEC §6.1 says.
+func TestNoWhitespaceInsideNSS(t *testing.T) {
+	for _, urn := range []string{
+		"urn:mhda:nt:evm:ci: 1",
+		"urn:mhda:nt:evm:ci:1 :dt:bip44:dp:m/44'/60'/0'/0/0",
+		"urn:mhda:nt: evm:ci:1",
+		"urn:mhda:nt:evm:ci:1:dt: bip44 :dp:m/44'/60'/0'/0/0",
+		"urn:mhda: nt:evm:ci:1",
+		"urn:mhda:nt:evm:ci:1\t:wt:x",
+	} {
+		if _, err := ParseURN(urn); !errors.Is(err, ErrInvalidNSS) {
+			t.Errorf("ParseURN(%q): got %v, want ErrInvalidNSS", urn, err)
+		}
+	}
+	for in, want := range map[string]string{
+		"  urn:mhda:nt:evm:ci:1\t":   "urn:mhda:nt:evm:ci:1",
+		"urn:mhda:nt:evm:ci:0 #frag": "urn:mhda:nt:evm:ci:0",
+		"urn:mhda:nt:evm:ci:1 ?=q":   "urn:mhda:nt:evm:ci:1",
+	} {
+		addr, err := ParseURN(in)
+		if err != nil {
+			t.Errorf("ParseURN(%q): %v", in, err)
+		} else if addr.String() != want {
+			t.Errorf("ParseURN(%q) = %q, want %q", in, addr.String(), want)
+		}
+	}
+	if _, err := ParseNSS(" nt:evm:ci:1 "); err != nil {
+		t.Errorf("ParseNSS with surrounding whitespace: %v", err)
+	}
+	if _, err := ChainFromNSS("\tnt:evm:ci:1 "); err != nil {
+		t.Errorf("ChainFromNSS with surrounding whitespace: %v", err)
+	}
+	if _, err := ChainFromNSS("nt:evm:ci: 1"); !errors.Is(err, ErrInvalidNSS) {
+		t.Errorf("ChainFromNSS with a space inside: got %v, want ErrInvalidNSS", err)
+	}
+}

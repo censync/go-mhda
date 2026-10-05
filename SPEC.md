@@ -101,12 +101,14 @@ truncate the URN emitted from it on the next parse.
 
 NSS values must consist of ASCII characters allowed by RFC 8141 NSS production
 (`pchar / "/"` per RFC 3986). The reference implementation enforces printable
-ASCII (0x21–0x7E) for every value: control bytes, whitespace of any kind and
-non-ASCII bytes are rejected. Only ASCII whitespace is trimmed around the URN
-and around values — a Unicode space is malformed input, never decoration to
-strip. The setters and the `...FromString` helpers follow the same rule:
+ASCII (0x21–0x7E) for every key and value: control bytes, whitespace of any
+kind and non-ASCII bytes are rejected. ASCII whitespace is trimmed only around
+the whole URN (or around an NSS or chain key parsed on its own), never around
+a key or value inside it; a Unicode space is malformed input, never decoration
+to strip. The setters and the `...FromString` helpers follow the same rule:
 they trim ASCII whitespace and fold ASCII case only, so a Unicode letter that
-lowercases to an ASCII one (the Kelvin sign `K`) is not another spelling. Percent-encoding is not implemented; if a value needs to contain `:`
+lowercases to an ASCII one (the Kelvin sign `K`) is not another spelling.
+Percent-encoding is not implemented; if a value needs to contain `:`
 (currently no in-tree value does), percent-encoding support must be added.
 
 ### 1.6 Wallet domain
@@ -354,8 +356,10 @@ Performs structural validation only:
 - Network type is one of the registered values.
 - Coin type, if present, is a valid 32-bit unsigned integer, spelled as
   plain decimal or `0x`-prefixed hex only (no other integer-literal forms).
-- Values contain no whitespace (interior whitespace is rejected; surrounding
-  whitespace around the whole URN is trimmed).
+- Values contain no whitespace. ASCII whitespace around the whole URN (or
+  around an NSS or chain key parsed on its own, or before a stripped r/q/f
+  component) is trimmed; around a key or value inside the NSS it is
+  rejected.
 - Chain ID is non-empty.
 - Derivation type, if present, is one of the registered constants.
 - Derivation path, if present, matches the regex of its derivation type,

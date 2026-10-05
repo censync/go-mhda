@@ -127,6 +127,12 @@ of 2^31 or more no longer parses.
   derivation type, path, format or coin type were trimmed, while the URN
   parser and the C++ port refuse the same bytes. They now trim ASCII
   whitespace and fold ASCII case only.
+- **No whitespace inside the NSS.** Each value was trimmed, so
+  `urn:mhda:nt:evm:ci: 1 :dt: bip44 :...` parsed like the URN without the
+  spaces, against SPEC §6.1. ASCII whitespace is now trimmed only around the
+  whole URN, around an NSS or chain key parsed on its own, and before a
+  stripped r/q/f component (`ci:0 #frag` still parses); around a key or
+  value it is refused with `ErrInvalidNSS`.
 - **No stale or mixed derivation state.** `ParsePath` updated the fields
   of the path it was given: re-parsing a 4-level ZIP-32 path with a 3-level
   one kept the old index (`m/32'/133'/1'` read back as `m/32'/133'/1'/5`),
