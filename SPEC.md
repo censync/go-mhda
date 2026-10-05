@@ -518,7 +518,9 @@ This automatically provides:
 - Any framework that consults `TextMarshaler` for value serialisation.
 
 `MarshalText` returns the canonical URN form. `UnmarshalText` accepts any
-valid input (lenient mode).
+valid input (lenient mode). `MarshalText` has a value receiver, so an
+`Address` held by value (a struct field, a map value) encodes as its URN as
+well; a nil `*Address` is encoded by the codec itself (JSON `null`).
 
 A `database/sql` adapter is not currently provided; callers can wrap
 `MarshalText`/`UnmarshalText` in their own `driver.Valuer` / `sql.Scanner`.

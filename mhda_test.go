@@ -1348,13 +1348,10 @@ func TestDerivationTypeAccessor(t *testing.T) {
 // TestMarshalTextNilAddress ensures MarshalText returns a sentinel error
 // rather than panicking on an uninitialised receiver.
 func TestMarshalTextNilAddress(t *testing.T) {
-	var a *Address // nil
-	_, err := a.MarshalText()
-	if !errors.Is(err, ErrUninitializedAddress) {
-		t.Errorf("nil receiver: got %v, want ErrUninitializedAddress", err)
-	}
+	// A nil *Address is encoded by the codec (as null, see
+	// TestTextCodecsWithAddressValues); MarshalText has a value receiver.
 	a2 := &Address{} // zero-value, no chain
-	_, err = a2.MarshalText()
+	_, err := a2.MarshalText()
 	if !errors.Is(err, ErrUninitializedAddress) {
 		t.Errorf("zero-value: got %v, want ErrUninitializedAddress", err)
 	}

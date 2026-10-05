@@ -108,6 +108,13 @@ of 2^31 or more no longer parses.
   zero chain (`urn:mhda:nt::ci:`, as the C++ port's default address) and a
   missing path as root; `SetCoinType` without a chain returns
   `ErrUninitializedAddress`.
+- **An `Address` held by value encodes as its URN.** `MarshalText` had a
+  pointer receiver, so an `Address` struct field or map value was encoded
+  by `encoding/json` and `encoding/xml` as an empty object (`{"A":{}}`),
+  which then failed to decode. `MarshalText` now has a value receiver. A
+  nil `*Address` is still encoded by the codec (as `null`); calling
+  `MarshalText` directly on a nil pointer now panics like any value method
+  instead of returning `ErrUninitializedAddress`.
 - **No stale or mixed derivation state.** `ParsePath` updated the fields
   of the path it was given: re-parsing a 4-level ZIP-32 path with a 3-level
   one kept the old index (`m/32'/133'/1'` read back as `m/32'/133'/1'/5`),

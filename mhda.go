@@ -444,9 +444,11 @@ func (a *Address) NSSHash256() string {
 
 // MarshalText implements encoding.TextMarshaler. This is the integration point
 // for encoding/json, encoding/xml, gopkg.in/yaml.v3 and similar codecs - they
-// will produce the URN form automatically.
-func (a *Address) MarshalText() ([]byte, error) {
-	if a == nil || a.chain == nil {
+// will produce the URN form automatically. The value receiver lets an Address
+// held by value (a struct field, a map value) encode too; codecs encode a nil
+// *Address themselves (as null) without calling it.
+func (a Address) MarshalText() ([]byte, error) {
+	if a.chain == nil {
 		return nil, ErrUninitializedAddress
 	}
 	if err := a.checkPathSet(); err != nil {
