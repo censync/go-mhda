@@ -82,6 +82,23 @@ of 2^31 or more no longer parses.
   parses, but no network registers it, so strict parsing refuses it. Both
   behaviours are unchanged and now pinned by tests.
 
+- **Strict validation refuses curve, purpose and format combinations no
+  wallet can derive.** It checked the algorithm, the format and the
+  derivation type each on its own, so it accepted SLIP-10 ed25519 paths
+  with soft levels (`nt:solana:...:dp:m/44'/501'/0/0`; ed25519 has no soft
+  derivation), `bip44` with ed25519 on XRPL, NEAR and Aptos, Sui `bip54`
+  with ed25519 or secp256r1, a Bitcoin `bip84` path with `af:p2pkh`, and
+  Cosmos `bip44` with coin `118'`, which is the `cip11` path again.
+  `ParseURNStrict` / `Validate` now return `ErrIncompatible` for: an
+  ed25519 path with an unhardened level (except `cip1852`, which is
+  BIP32-Ed25519); a derivation type with another curve than its own on Sui
+  (`slip10` ed25519, `bip54` secp256k1, `bip74` secp256r1), Aptos and NEAR
+  (`slip10` ed25519, `bip44` secp256k1); an explicit Bitcoin format that
+  does not match the purpose (`bip44` p2pkh, `bip49` p2sh, `bip84` p2wpkh
+  or bech32, `bip86` p2tr or bech32m); and Cosmos `bip44` with coin
+  `118'`. A Bitcoin URN without `af` stays valid; SPEC.md no longer claims
+  strict mode requires it. Lenient parsing is unchanged.
+
 ### Fixed
 
 - **No stale or mixed derivation state.** `ParsePath` updated the fields

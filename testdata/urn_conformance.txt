@@ -1,17 +1,19 @@
 # URN conformance table, shared verbatim by go-mhda
 # (testdata/urn_conformance.txt) and the C++ port (tests/data/urn_conformance.txt).
-# Both test suites run every row through the lenient parser; an input one
-# implementation refuses, the other refuses too, with the same error. Edit
-# both copies together.
+# Both test suites run every row; an input one implementation refuses, the
+# other refuses too, with the same error. Edit both copies together.
 #
 # Row forms:
 #   accept urn <input URN> <canonical URN>
 #   accept nss <input NSS> <canonical URN>
+#   accept strict <input URN> <canonical URN>
 #   refuse urn <error> <input URN>
 #   refuse nss <error> <input NSS>
-# <error> is the C++ error_code name; go-mhda maps it to its sentinel
-# (invalid_nss is ErrInvalidNSS, invalid_derivation_path is
-# ErrInvalidDerivationPath, ...).
+#   refuse strict <error> <input URN>
+# urn rows use the lenient parser, strict rows ParseURNStrict /
+# parse_urn_strict. <error> is the C++ error_code name; go-mhda maps it to
+# its sentinel (invalid_nss is ErrInvalidNSS, incompatible is
+# ErrIncompatible, ...).
 
 # A derivation path needs a derivation type other than root. Without dt the
 # address is root, and a dp there would be dropped: the URN would name the
@@ -63,3 +65,60 @@ accept urn urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0#frag urn:mhda:nt:ev
 accept urn urn:mhda:nt:ton:ci:mainnet:dt:root urn:mhda:nt:ton:ci:mainnet
 accept urn urn:mhda:nt:algorand:ci:mainnet:ct:283:dt:root:af:base32 urn:mhda:nt:algorand:ci:mainnet:ct:283:af:base32
 accept urn urn:mhda:nt:evm:ci:1:dt:ROOT urn:mhda:nt:evm:ci:1
+
+# Strict mode and the curves. SLIP-10 derives ed25519 keys through hardened
+# levels only, so every level of an ed25519 path must be hardened; cip1852
+# (BIP32-Ed25519) is the one ed25519 scheme with soft levels. The lenient
+# parser still accepts these paths.
+refuse strict incompatible urn:mhda:nt:solana:ci:mainnet:dt:slip10:dp:m/44'/501'/0/0
+refuse strict incompatible urn:mhda:nt:solana:ci:mainnet:dt:slip10:dp:m/44'/501'/0'/0'/7
+refuse strict incompatible urn:mhda:nt:stellar:ci:pubnet:dt:slip10:dp:m/44'/148'/0
+refuse strict incompatible urn:mhda:nt:ton:ci:mainnet:dt:slip10:dp:m/44'/607'/0'/0'/0
+refuse strict incompatible urn:mhda:nt:cosmos:ci:secret:dt:bip44:dp:m/44'/529'/0'/0/0:aa:ed25519
+refuse strict incompatible urn:mhda:nt:xrpl:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519
+accept urn urn:mhda:nt:solana:ci:mainnet:dt:slip10:dp:m/44'/501'/0/0 urn:mhda:nt:solana:ci:mainnet:dt:slip10:dp:m/44'/501'/0/0
+accept strict urn:mhda:nt:solana:ci:mainnet:dt:slip10:dp:m/44'/501'/0'/0' urn:mhda:nt:solana:ci:mainnet:dt:slip10:dp:m/44'/501'/0'/0'
+accept strict urn:mhda:nt:stellar:ci:pubnet:dt:slip10:dp:m/44'/148'/0' urn:mhda:nt:stellar:ci:pubnet:dt:slip10:dp:m/44'/148'/0'
+accept strict urn:mhda:nt:ton:ci:mainnet:dt:slip10:dp:m/44'/607'/0' urn:mhda:nt:ton:ci:mainnet:dt:slip10:dp:m/44'/607'/0'
+accept strict urn:mhda:nt:cardano:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0 urn:mhda:nt:cardano:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/0/0
+accept strict urn:mhda:nt:xrpl:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0 urn:mhda:nt:xrpl:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0
+
+# Sui encodes the signature scheme in the purpose (bip54 secp256k1, bip74
+# secp256r1, slip10 ed25519); Aptos and NEAR derive ed25519 through slip10
+# and secp256k1 through bip44. A derivation type takes only its own curve.
+refuse strict incompatible urn:mhda:nt:sui:ci:mainnet:dt:bip54:dp:m/54'/784'/0'/0/0
+refuse strict incompatible urn:mhda:nt:sui:ci:mainnet:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256r1
+refuse strict incompatible urn:mhda:nt:sui:ci:mainnet:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256k1
+refuse strict incompatible urn:mhda:nt:sui:ci:mainnet:dt:slip10:dp:m/44'/784'/0'/0'/0':aa:secp256k1
+refuse strict incompatible urn:mhda:nt:aptos:ci:mainnet:dt:bip44:dp:m/44'/637'/0'/0/0
+refuse strict incompatible urn:mhda:nt:aptos:ci:mainnet:dt:slip10:dp:m/44'/637'/0'/0'/0':aa:secp256k1
+refuse strict incompatible urn:mhda:nt:near:ci:mainnet:dt:bip44:dp:m/44'/397'/0'/0/0
+accept strict urn:mhda:nt:sui:ci:mainnet:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256k1 urn:mhda:nt:sui:ci:mainnet:dt:bip54:dp:m/54'/784'/0'/0/0:aa:secp256k1
+accept strict urn:mhda:nt:sui:ci:mainnet:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256r1 urn:mhda:nt:sui:ci:mainnet:dt:bip74:dp:m/74'/784'/0'/0/0:aa:secp256r1
+accept strict urn:mhda:nt:sui:ci:mainnet:dt:slip10:dp:m/44'/784'/0'/0'/0' urn:mhda:nt:sui:ci:mainnet:dt:slip10:dp:m/44'/784'/0'/0'/0'
+accept strict urn:mhda:nt:aptos:ci:mainnet:dt:bip44:dp:m/44'/637'/0'/0/0:aa:secp256k1 urn:mhda:nt:aptos:ci:mainnet:dt:bip44:dp:m/44'/637'/0'/0/0:aa:secp256k1
+accept strict urn:mhda:nt:aptos:ci:mainnet:dt:slip10:dp:m/44'/637'/0'/0'/0' urn:mhda:nt:aptos:ci:mainnet:dt:slip10:dp:m/44'/637'/0'/0'/0'
+accept strict urn:mhda:nt:near:ci:mainnet:dt:bip44:dp:m/44'/397'/0'/0/1:aa:secp256k1 urn:mhda:nt:near:ci:mainnet:dt:bip44:dp:m/44'/397'/0'/0/1:aa:secp256k1
+accept strict urn:mhda:nt:near:ci:mainnet:dt:slip10:dp:m/44'/397'/0' urn:mhda:nt:near:ci:mainnet:dt:slip10:dp:m/44'/397'/0'
+
+# Bitcoin: the purpose defines the script, so an explicit af must match it
+# (bip44 p2pkh, bip49 p2sh, bip84 p2wpkh or bech32, bip86 p2tr or bech32m;
+# bip32 takes any). Without af the URN stays valid.
+refuse strict incompatible urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2pkh
+refuse strict incompatible urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2wpkh
+refuse strict incompatible urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip49:dp:m/49'/0'/0'/0/0:af:p2wpkh
+refuse strict incompatible urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32
+accept strict urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0 urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0
+accept strict urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2wpkh urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2wpkh
+accept strict urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32 urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32
+accept strict urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:p2tr urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:p2tr
+accept strict urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m
+accept strict urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip49:dp:m/49'/0'/0'/0/0:af:p2sh urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip49:dp:m/49'/0'/0'/0/0:af:p2sh
+accept strict urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2pkh urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2pkh
+accept strict urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip32:dp:m/0'/0/0:af:p2wpkh urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip32:dp:m/0'/0/0:af:p2wpkh
+
+# Cosmos: bip44 with coin 118' is the cip11 path m/44'/118'/... (one key,
+# two spellings); strict mode keeps cip11. bip44 with another coin stays.
+refuse strict incompatible urn:mhda:nt:cosmos:ci:cosmoshub:dt:bip44:dp:m/44'/118'/0'/0/0
+accept strict urn:mhda:nt:cosmos:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/0/0 urn:mhda:nt:cosmos:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/0/0
+accept strict urn:mhda:nt:cosmos:ci:secret:dt:bip44:dp:m/44'/529'/0'/0/0 urn:mhda:nt:cosmos:ci:secret:dt:bip44:dp:m/44'/529'/0'/0/0

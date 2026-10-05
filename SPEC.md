@@ -164,9 +164,11 @@ keeps the family name rather than any flagship chain's name.
 ### 2.1 Per-network notes
 
 #### Bitcoin (`bitcoin`)
-Multiple legitimate scripts; format must be specified explicitly under strict
-validation. `ap` is conventionally `1` (P2PKH), `3` (P2SH), `bc1q` (bech32),
-`bc1p` (bech32m / Taproot).
+Multiple legitimate scripts, so there is no default format and `af` may be
+omitted. When given, it must match the script the purpose defines, under
+strict validation: `bip44` p2pkh, `bip49` p2sh, `bip84` p2wpkh or bech32,
+`bip86` p2tr or bech32m; `bip32` takes any. `ap` is conventionally `1`
+(P2PKH), `3` (P2SH), `bc1q` (bech32), `bc1p` (bech32m / Taproot).
 
 #### Ethereum and EVM clones (`evm`)
 Single canonical format (hex). Chain ID typically a numeric chain ID such as
@@ -179,6 +181,8 @@ C-Chain uses hex (EVM-compatible); X/P-Chain use bech32 with HRPs `X-avax`,
 #### Cosmos (`cosmos`)
 Cosmos chains traditionally use BIP-44 with coin type 118; some deployments
 register their own SLIP-44 entries. CIP-11 is `m/44'/118'/account'/charge_extra/address`.
+`bip44` with coin `118'` is the same path as `cip11`, so strict validation
+refuses it and keeps the `cip11` spelling; `bip44` with another coin stays.
 
 #### Solana (`solana`)
 SLIP-10 ed25519 only. Common path forms: `m/44'/501'`, `m/44'/501'/account'`,
@@ -186,7 +190,9 @@ SLIP-10 ed25519 only. Common path forms: `m/44'/501'`, `m/44'/501'/account'`,
 
 #### XRP Ledger (`xrpl`)
 secp256k1 is the historical default; ed25519 is supported by newer wallets.
-Addresses use base58 with XRPL's custom alphabet (start with `r`).
+XRPL ed25519 keys come from a family seed, not an HD path, so their URN is
+root (`aa:ed25519`, no `dt`); `bip44` with ed25519 fails strict validation
+(see §6.2). Addresses use base58 with XRPL's custom alphabet (start with `r`).
 
 #### Stellar (`stellar`)
 SEP-0005 mandates SLIP-10 ed25519 with `m/44'/148'/account'` (3 levels, all
@@ -197,11 +203,14 @@ SEP-0023. Common version bytes: `G` (account), `S` (seed), `M` (muxed),
 #### NEAR (`near`)
 ed25519-implicit accounts use raw 64-char hex of pubkey. ETH-implicit accounts
 use `0x` + 40 hex from secp256k1 + keccak256. Named accounts (`alice.near`)
-are not HD-derived and not represented by MHDA.
+are not HD-derived and not represented by MHDA. ed25519 keys derive through
+`slip10`, secp256k1 keys through `bip44`; strict validation holds each
+derivation type to its curve.
 
 #### Aptos (`aptos`)
 ed25519 path `m/44'/637'/account'/change'/index'` (all 5 hardened, enforced by
 aptos-ts-sdk). secp256k1 path `m/44'/637'/account'/change/index` (BIP-44).
+Strict validation holds `slip10` to ed25519 and `bip44` to secp256k1.
 
 #### Sui (`sui`)
 The signature scheme is encoded in the `purpose` field of the path:
@@ -213,7 +222,9 @@ secp256r1:  m/74'/784'/account'/change/index     (BIP-32, purpose=74')
 ```
 
 Address = Blake2b-256(flag || pubkey), 0x + 64 hex chars. Flag bytes:
-0x00 ed25519, 0x01 secp256k1, 0x02 secp256r1.
+0x00 ed25519, 0x01 secp256k1, 0x02 secp256r1. Strict validation holds each
+derivation type to its scheme: `slip10` ed25519, `bip54` secp256k1, `bip74`
+secp256r1.
 
 #### Cardano (`cardano`)
 BIP32-Ed25519 (extended keys with soft-derivation, distinct from SLIP-10
@@ -363,6 +374,19 @@ compatibility set. Defaults are applied first, so a short URN is validated
 as if rewritten in long form.
 
 ROOT is always accepted regardless of network.
+
+Strict validation also refuses combinations no wallet can derive or that
+name one key twice:
+
+- ed25519 with any unhardened level, except under `cip1852`: SLIP-10
+  derives ed25519 keys through hardened levels only (CIP-1852 is
+  BIP32-Ed25519, which has soft derivation).
+- A derivation type with a curve other than its own where the network binds
+  them (Sui, Aptos, NEAR; see §2.1).
+- A Bitcoin format that does not match the purpose of the path (§2.1).
+- A Cosmos `bip44` path with coin `118'`, which is the `cip11` path.
+
+These fail with `ErrIncompatible`; lenient parsing still accepts the paths.
 
 An address built in code can have a derivation type without a path:
 `SetDerivationType` with a new type drops the old path, which belongs to the

@@ -22,6 +22,7 @@ var conformanceErrors = map[string]error{
 	"invalid_algorithm":       ErrInvalidAlgorithm,
 	"invalid_format":          ErrInvalidFormat,
 	"invalid_value":           ErrInvalidValue,
+	"incompatible":            ErrIncompatible,
 }
 
 // TestURNConformance runs the URN table shared with the C++ port
@@ -43,7 +44,7 @@ func TestURNConformance(t *testing.T) {
 			continue
 		}
 		fields := strings.Fields(text)
-		if len(fields) != 4 || (fields[1] != "urn" && fields[1] != "nss") {
+		if len(fields) != 4 || (fields[1] != "urn" && fields[1] != "nss" && fields[1] != "strict") {
 			t.Fatalf("urn_conformance.txt:%d: malformed row %q", line, text)
 		}
 		rows++
@@ -62,8 +63,11 @@ func TestURNConformance(t *testing.T) {
 		}
 
 		parse := ParseURN
-		if fields[1] == "nss" {
+		switch fields[1] {
+		case "nss":
 			parse = ParseNSS
+		case "strict":
+			parse = ParseURNStrict
 		}
 		addr, err := parse(input)
 		if accept {

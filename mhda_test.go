@@ -180,9 +180,10 @@ func TestStrictPreservesLenient(t *testing.T) {
 func TestBitcoinFormats(t *testing.T) {
 	for _, urn := range []string{
 		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2pkh`,
-		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2sh`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip49:dp:m/49'/0'/0'/0/0:af:p2sh`,
 		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2wpkh`,
-		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2wsh`,
+		// P2WSH has no single-key purpose (multisig is BIP-48): plain bip32.
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip32:dp:m/0'/0/0:af:p2wsh`,
 		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32`,
 		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip86:dp:m/86'/0'/0'/0/0:af:p2tr`,
 		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m`,
@@ -265,7 +266,7 @@ func TestREADMEExamples(t *testing.T) {
 		`urn:mhda:nt:solana:ci:mainnet:dt:slip10:dp:m/44'/501'/0'/0'`,
 		// XRP Ledger
 		`urn:mhda:nt:xrpl:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0`,
-		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519`,
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:aa:ed25519`,
 		// Stellar
 		`urn:mhda:nt:stellar:ci:mainnet:dt:slip10:dp:m/44'/148'/0'`,
 		// NEAR
@@ -771,8 +772,8 @@ func TestXRP(t *testing.T) {
 		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0`,
 		// long form with explicit defaults
 		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:secp256k1:af:base58`,
-		// ed25519 variant (XLS-10 / XUMM-style)
-		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519:af:base58`,
+		// ed25519 keys come from a family seed, not an HD path: root form
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:aa:ed25519:af:base58`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -803,6 +804,8 @@ func TestXRPRejectsInvalidCombos(t *testing.T) {
 	bad := []string{
 		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:aa:sr25519`, // unsupported algo
 		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:af:hex`,     // unsupported format
+		// ed25519 has no soft levels, so it cannot derive this BIP-44 path
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519`,
 	}
 	for _, urn := range bad {
 		_, err := ParseURNStrict(urn)
