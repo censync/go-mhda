@@ -895,6 +895,44 @@ func TestCIP1852Levels(t *testing.T) {
 	}
 }
 
+// TestWideChargeLevel: the CIP-11 charge and the CIP-1852 role take any
+// level index. A value above 255 must keep its full width - truncated to a
+// byte, role 256 would name the role-0 key.
+func TestWideChargeLevel(t *testing.T) {
+	cases := []struct {
+		urn  string
+		want uint32
+	}{
+		{`urn:mhda:nt:cardano:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/256/0`, 256},
+		{`urn:mhda:nt:cardano:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/2147483647/0`, 2147483647},
+		{`urn:mhda:nt:cosmos:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/257/0`, 257},
+		{`urn:mhda:nt:cosmos:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/65536/0`, 65536},
+	}
+	for _, c := range cases {
+		addr, err := ParseURNStrict(c.urn)
+		if err != nil {
+			t.Errorf("ParseURNStrict(%q): %v", c.urn, err)
+			continue
+		}
+		if addr.String() != c.urn {
+			t.Errorf("round-trip:\n got:  %s\n want: %s", addr.String(), c.urn)
+		}
+		dp := addr.DerivationPath()
+		if uint32(dp.Charge()) != c.want {
+			t.Errorf("%q: Charge() = %d, want %d", c.urn, dp.Charge(), c.want)
+		}
+		if got := dp.Levels()[3]; got != (AddressIndex{Index: c.want}) {
+			t.Errorf("%q: level[3] = %+v, want {%d false}", c.urn, got, c.want)
+		}
+	}
+
+	role := uint32(300)
+	dp := NewDerivationPath(CIP1852, ADA, 0, ChargeType(role), AddressIndex{Index: 1})
+	if got, want := dp.String(), `m/1852'/1815'/0'/300/1`; got != want {
+		t.Errorf("NewDerivationPath role 300: String() = %q, want %q", got, want)
+	}
+}
+
 // TestSLIP10 covers the generic SLIP-10 derivation type with paths from
 // real-world chains: Solana (4 levels), Stellar (SEP-0005, 3 levels), Sui
 // ed25519 (5 levels all-hardened), Aptos (5 levels all-hardened).

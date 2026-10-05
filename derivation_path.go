@@ -59,7 +59,11 @@ func DerivationTypeFromString(src string) (DerivationType, error) {
 
 type AccountIndex uint32
 
-type ChargeType uint8
+// ChargeType is the level after the account: the change level of BIP-32 and
+// the BIP-44 family (0 external, 1 internal), the CIP-11 charge and the
+// CIP-1852 role. It is as wide as a level index: the CIP-11 charge and the
+// CIP-1852 role take any index.
+type ChargeType uint32
 
 type AddressIndex struct {
 	Index      uint32
