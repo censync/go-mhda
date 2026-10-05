@@ -1,0 +1,466 @@
+# Derivation-path conformance table, shared verbatim by go-mhda
+# (testdata/dp_conformance.txt) and the C++ port (tests/data/dp_conformance.txt).
+# Both test suites run every row; a path one implementation refuses, the other
+# refuses too. Edit both copies together.
+#
+# Row forms:
+#   accept <dt> <dp> <canonical dp>
+#   refuse <dt> <dp>
+# A refused row fails with ErrInvalidDerivationPath / error_code::invalid_derivation_path.
+#
+# Each level's index is 0..2^31-1; the hardened marker is a separate flag.
+# 2147483647 is the largest index, 2147483648 (2^31) and 4294967295 (2^32-1)
+# are refused at every level of every type, hardened or not. Values at a
+# level whose shape they do not fit (an unhardened account, a hardened
+# charge, any value in a fixed level) are refused for shape.
+
+# bip32 m/0'/0/0
+# bip32 account (hardened only)
+refuse bip32 m/2147483647/0/0
+accept bip32 m/2147483647'/0/0 m/2147483647'/0/0
+refuse bip32 m/2147483648/0/0
+refuse bip32 m/2147483648'/0/0
+refuse bip32 m/4294967295/0/0
+refuse bip32 m/4294967295'/0/0
+# bip32 charge (fixed 0|1)
+refuse bip32 m/0'/2147483647/0
+refuse bip32 m/0'/2147483647'/0
+refuse bip32 m/0'/2147483648/0
+refuse bip32 m/0'/2147483648'/0
+refuse bip32 m/0'/4294967295/0
+refuse bip32 m/0'/4294967295'/0
+# bip32 index (hardening optional)
+accept bip32 m/0'/0/2147483647 m/0'/0/2147483647
+accept bip32 m/0'/0/2147483647' m/0'/0/2147483647'
+refuse bip32 m/0'/0/2147483648
+refuse bip32 m/0'/0/2147483648'
+refuse bip32 m/0'/0/4294967295
+refuse bip32 m/0'/0/4294967295'
+
+# bip44 m/44'/60'/0'/0/0
+# bip44 purpose (fixed)
+refuse bip44 m/2147483647/60'/0'/0/0
+refuse bip44 m/2147483647'/60'/0'/0/0
+refuse bip44 m/2147483648/60'/0'/0/0
+refuse bip44 m/2147483648'/60'/0'/0/0
+refuse bip44 m/4294967295/60'/0'/0/0
+refuse bip44 m/4294967295'/60'/0'/0/0
+# bip44 coin (hardened only)
+refuse bip44 m/44'/2147483647/0'/0/0
+accept bip44 m/44'/2147483647'/0'/0/0 m/44'/2147483647'/0'/0/0
+refuse bip44 m/44'/2147483648/0'/0/0
+refuse bip44 m/44'/2147483648'/0'/0/0
+refuse bip44 m/44'/4294967295/0'/0/0
+refuse bip44 m/44'/4294967295'/0'/0/0
+# bip44 account (hardened only)
+refuse bip44 m/44'/60'/2147483647/0/0
+accept bip44 m/44'/60'/2147483647'/0/0 m/44'/60'/2147483647'/0/0
+refuse bip44 m/44'/60'/2147483648/0/0
+refuse bip44 m/44'/60'/2147483648'/0/0
+refuse bip44 m/44'/60'/4294967295/0/0
+refuse bip44 m/44'/60'/4294967295'/0/0
+# bip44 charge (fixed 0|1)
+refuse bip44 m/44'/60'/0'/2147483647/0
+refuse bip44 m/44'/60'/0'/2147483647'/0
+refuse bip44 m/44'/60'/0'/2147483648/0
+refuse bip44 m/44'/60'/0'/2147483648'/0
+refuse bip44 m/44'/60'/0'/4294967295/0
+refuse bip44 m/44'/60'/0'/4294967295'/0
+# bip44 index (hardening optional)
+accept bip44 m/44'/60'/0'/0/2147483647 m/44'/60'/0'/0/2147483647
+accept bip44 m/44'/60'/0'/0/2147483647' m/44'/60'/0'/0/2147483647'
+refuse bip44 m/44'/60'/0'/0/2147483648
+refuse bip44 m/44'/60'/0'/0/2147483648'
+refuse bip44 m/44'/60'/0'/0/4294967295
+refuse bip44 m/44'/60'/0'/0/4294967295'
+
+# bip49 m/49'/0'/0'/0/0
+# bip49 purpose (fixed)
+refuse bip49 m/2147483647/0'/0'/0/0
+refuse bip49 m/2147483647'/0'/0'/0/0
+refuse bip49 m/2147483648/0'/0'/0/0
+refuse bip49 m/2147483648'/0'/0'/0/0
+refuse bip49 m/4294967295/0'/0'/0/0
+refuse bip49 m/4294967295'/0'/0'/0/0
+# bip49 coin (hardened only)
+refuse bip49 m/49'/2147483647/0'/0/0
+accept bip49 m/49'/2147483647'/0'/0/0 m/49'/2147483647'/0'/0/0
+refuse bip49 m/49'/2147483648/0'/0/0
+refuse bip49 m/49'/2147483648'/0'/0/0
+refuse bip49 m/49'/4294967295/0'/0/0
+refuse bip49 m/49'/4294967295'/0'/0/0
+# bip49 account (hardened only)
+refuse bip49 m/49'/0'/2147483647/0/0
+accept bip49 m/49'/0'/2147483647'/0/0 m/49'/0'/2147483647'/0/0
+refuse bip49 m/49'/0'/2147483648/0/0
+refuse bip49 m/49'/0'/2147483648'/0/0
+refuse bip49 m/49'/0'/4294967295/0/0
+refuse bip49 m/49'/0'/4294967295'/0/0
+# bip49 charge (fixed 0|1)
+refuse bip49 m/49'/0'/0'/2147483647/0
+refuse bip49 m/49'/0'/0'/2147483647'/0
+refuse bip49 m/49'/0'/0'/2147483648/0
+refuse bip49 m/49'/0'/0'/2147483648'/0
+refuse bip49 m/49'/0'/0'/4294967295/0
+refuse bip49 m/49'/0'/0'/4294967295'/0
+# bip49 index (hardening optional)
+accept bip49 m/49'/0'/0'/0/2147483647 m/49'/0'/0'/0/2147483647
+accept bip49 m/49'/0'/0'/0/2147483647' m/49'/0'/0'/0/2147483647'
+refuse bip49 m/49'/0'/0'/0/2147483648
+refuse bip49 m/49'/0'/0'/0/2147483648'
+refuse bip49 m/49'/0'/0'/0/4294967295
+refuse bip49 m/49'/0'/0'/0/4294967295'
+
+# bip54 m/54'/784'/0'/0/0
+# bip54 purpose (fixed)
+refuse bip54 m/2147483647/784'/0'/0/0
+refuse bip54 m/2147483647'/784'/0'/0/0
+refuse bip54 m/2147483648/784'/0'/0/0
+refuse bip54 m/2147483648'/784'/0'/0/0
+refuse bip54 m/4294967295/784'/0'/0/0
+refuse bip54 m/4294967295'/784'/0'/0/0
+# bip54 coin (hardened only)
+refuse bip54 m/54'/2147483647/0'/0/0
+accept bip54 m/54'/2147483647'/0'/0/0 m/54'/2147483647'/0'/0/0
+refuse bip54 m/54'/2147483648/0'/0/0
+refuse bip54 m/54'/2147483648'/0'/0/0
+refuse bip54 m/54'/4294967295/0'/0/0
+refuse bip54 m/54'/4294967295'/0'/0/0
+# bip54 account (hardened only)
+refuse bip54 m/54'/784'/2147483647/0/0
+accept bip54 m/54'/784'/2147483647'/0/0 m/54'/784'/2147483647'/0/0
+refuse bip54 m/54'/784'/2147483648/0/0
+refuse bip54 m/54'/784'/2147483648'/0/0
+refuse bip54 m/54'/784'/4294967295/0/0
+refuse bip54 m/54'/784'/4294967295'/0/0
+# bip54 charge (fixed 0|1)
+refuse bip54 m/54'/784'/0'/2147483647/0
+refuse bip54 m/54'/784'/0'/2147483647'/0
+refuse bip54 m/54'/784'/0'/2147483648/0
+refuse bip54 m/54'/784'/0'/2147483648'/0
+refuse bip54 m/54'/784'/0'/4294967295/0
+refuse bip54 m/54'/784'/0'/4294967295'/0
+# bip54 index (hardening optional)
+accept bip54 m/54'/784'/0'/0/2147483647 m/54'/784'/0'/0/2147483647
+accept bip54 m/54'/784'/0'/0/2147483647' m/54'/784'/0'/0/2147483647'
+refuse bip54 m/54'/784'/0'/0/2147483648
+refuse bip54 m/54'/784'/0'/0/2147483648'
+refuse bip54 m/54'/784'/0'/0/4294967295
+refuse bip54 m/54'/784'/0'/0/4294967295'
+
+# bip74 m/74'/784'/0'/0/0
+# bip74 purpose (fixed)
+refuse bip74 m/2147483647/784'/0'/0/0
+refuse bip74 m/2147483647'/784'/0'/0/0
+refuse bip74 m/2147483648/784'/0'/0/0
+refuse bip74 m/2147483648'/784'/0'/0/0
+refuse bip74 m/4294967295/784'/0'/0/0
+refuse bip74 m/4294967295'/784'/0'/0/0
+# bip74 coin (hardened only)
+refuse bip74 m/74'/2147483647/0'/0/0
+accept bip74 m/74'/2147483647'/0'/0/0 m/74'/2147483647'/0'/0/0
+refuse bip74 m/74'/2147483648/0'/0/0
+refuse bip74 m/74'/2147483648'/0'/0/0
+refuse bip74 m/74'/4294967295/0'/0/0
+refuse bip74 m/74'/4294967295'/0'/0/0
+# bip74 account (hardened only)
+refuse bip74 m/74'/784'/2147483647/0/0
+accept bip74 m/74'/784'/2147483647'/0/0 m/74'/784'/2147483647'/0/0
+refuse bip74 m/74'/784'/2147483648/0/0
+refuse bip74 m/74'/784'/2147483648'/0/0
+refuse bip74 m/74'/784'/4294967295/0/0
+refuse bip74 m/74'/784'/4294967295'/0/0
+# bip74 charge (fixed 0|1)
+refuse bip74 m/74'/784'/0'/2147483647/0
+refuse bip74 m/74'/784'/0'/2147483647'/0
+refuse bip74 m/74'/784'/0'/2147483648/0
+refuse bip74 m/74'/784'/0'/2147483648'/0
+refuse bip74 m/74'/784'/0'/4294967295/0
+refuse bip74 m/74'/784'/0'/4294967295'/0
+# bip74 index (hardening optional)
+accept bip74 m/74'/784'/0'/0/2147483647 m/74'/784'/0'/0/2147483647
+accept bip74 m/74'/784'/0'/0/2147483647' m/74'/784'/0'/0/2147483647'
+refuse bip74 m/74'/784'/0'/0/2147483648
+refuse bip74 m/74'/784'/0'/0/2147483648'
+refuse bip74 m/74'/784'/0'/0/4294967295
+refuse bip74 m/74'/784'/0'/0/4294967295'
+
+# bip84 m/84'/0'/0'/0/0
+# bip84 purpose (fixed)
+refuse bip84 m/2147483647/0'/0'/0/0
+refuse bip84 m/2147483647'/0'/0'/0/0
+refuse bip84 m/2147483648/0'/0'/0/0
+refuse bip84 m/2147483648'/0'/0'/0/0
+refuse bip84 m/4294967295/0'/0'/0/0
+refuse bip84 m/4294967295'/0'/0'/0/0
+# bip84 coin (hardened only)
+refuse bip84 m/84'/2147483647/0'/0/0
+accept bip84 m/84'/2147483647'/0'/0/0 m/84'/2147483647'/0'/0/0
+refuse bip84 m/84'/2147483648/0'/0/0
+refuse bip84 m/84'/2147483648'/0'/0/0
+refuse bip84 m/84'/4294967295/0'/0/0
+refuse bip84 m/84'/4294967295'/0'/0/0
+# bip84 account (hardened only)
+refuse bip84 m/84'/0'/2147483647/0/0
+accept bip84 m/84'/0'/2147483647'/0/0 m/84'/0'/2147483647'/0/0
+refuse bip84 m/84'/0'/2147483648/0/0
+refuse bip84 m/84'/0'/2147483648'/0/0
+refuse bip84 m/84'/0'/4294967295/0/0
+refuse bip84 m/84'/0'/4294967295'/0/0
+# bip84 charge (fixed 0|1)
+refuse bip84 m/84'/0'/0'/2147483647/0
+refuse bip84 m/84'/0'/0'/2147483647'/0
+refuse bip84 m/84'/0'/0'/2147483648/0
+refuse bip84 m/84'/0'/0'/2147483648'/0
+refuse bip84 m/84'/0'/0'/4294967295/0
+refuse bip84 m/84'/0'/0'/4294967295'/0
+# bip84 index (hardening optional)
+accept bip84 m/84'/0'/0'/0/2147483647 m/84'/0'/0'/0/2147483647
+accept bip84 m/84'/0'/0'/0/2147483647' m/84'/0'/0'/0/2147483647'
+refuse bip84 m/84'/0'/0'/0/2147483648
+refuse bip84 m/84'/0'/0'/0/2147483648'
+refuse bip84 m/84'/0'/0'/0/4294967295
+refuse bip84 m/84'/0'/0'/0/4294967295'
+
+# bip86 m/86'/0'/0'/0/0
+# bip86 purpose (fixed)
+refuse bip86 m/2147483647/0'/0'/0/0
+refuse bip86 m/2147483647'/0'/0'/0/0
+refuse bip86 m/2147483648/0'/0'/0/0
+refuse bip86 m/2147483648'/0'/0'/0/0
+refuse bip86 m/4294967295/0'/0'/0/0
+refuse bip86 m/4294967295'/0'/0'/0/0
+# bip86 coin (hardened only)
+refuse bip86 m/86'/2147483647/0'/0/0
+accept bip86 m/86'/2147483647'/0'/0/0 m/86'/2147483647'/0'/0/0
+refuse bip86 m/86'/2147483648/0'/0/0
+refuse bip86 m/86'/2147483648'/0'/0/0
+refuse bip86 m/86'/4294967295/0'/0/0
+refuse bip86 m/86'/4294967295'/0'/0/0
+# bip86 account (hardened only)
+refuse bip86 m/86'/0'/2147483647/0/0
+accept bip86 m/86'/0'/2147483647'/0/0 m/86'/0'/2147483647'/0/0
+refuse bip86 m/86'/0'/2147483648/0/0
+refuse bip86 m/86'/0'/2147483648'/0/0
+refuse bip86 m/86'/0'/4294967295/0/0
+refuse bip86 m/86'/0'/4294967295'/0/0
+# bip86 charge (fixed 0|1)
+refuse bip86 m/86'/0'/0'/2147483647/0
+refuse bip86 m/86'/0'/0'/2147483647'/0
+refuse bip86 m/86'/0'/0'/2147483648/0
+refuse bip86 m/86'/0'/0'/2147483648'/0
+refuse bip86 m/86'/0'/0'/4294967295/0
+refuse bip86 m/86'/0'/0'/4294967295'/0
+# bip86 index (hardening optional)
+accept bip86 m/86'/0'/0'/0/2147483647 m/86'/0'/0'/0/2147483647
+accept bip86 m/86'/0'/0'/0/2147483647' m/86'/0'/0'/0/2147483647'
+refuse bip86 m/86'/0'/0'/0/2147483648
+refuse bip86 m/86'/0'/0'/0/2147483648'
+refuse bip86 m/86'/0'/0'/0/4294967295
+refuse bip86 m/86'/0'/0'/0/4294967295'
+
+# cip11 m/44'/118'/0'/0/0
+# cip11 purpose (fixed)
+refuse cip11 m/2147483647/118'/0'/0/0
+refuse cip11 m/2147483647'/118'/0'/0/0
+refuse cip11 m/2147483648/118'/0'/0/0
+refuse cip11 m/2147483648'/118'/0'/0/0
+refuse cip11 m/4294967295/118'/0'/0/0
+refuse cip11 m/4294967295'/118'/0'/0/0
+# cip11 coin (fixed)
+refuse cip11 m/44'/2147483647/0'/0/0
+refuse cip11 m/44'/2147483647'/0'/0/0
+refuse cip11 m/44'/2147483648/0'/0/0
+refuse cip11 m/44'/2147483648'/0'/0/0
+refuse cip11 m/44'/4294967295/0'/0/0
+refuse cip11 m/44'/4294967295'/0'/0/0
+# cip11 account (hardened only)
+refuse cip11 m/44'/118'/2147483647/0/0
+accept cip11 m/44'/118'/2147483647'/0/0 m/44'/118'/2147483647'/0/0
+refuse cip11 m/44'/118'/2147483648/0/0
+refuse cip11 m/44'/118'/2147483648'/0/0
+refuse cip11 m/44'/118'/4294967295/0/0
+refuse cip11 m/44'/118'/4294967295'/0/0
+# cip11 charge (soft only)
+accept cip11 m/44'/118'/0'/2147483647/0 m/44'/118'/0'/2147483647/0
+refuse cip11 m/44'/118'/0'/2147483647'/0
+refuse cip11 m/44'/118'/0'/2147483648/0
+refuse cip11 m/44'/118'/0'/2147483648'/0
+refuse cip11 m/44'/118'/0'/4294967295/0
+refuse cip11 m/44'/118'/0'/4294967295'/0
+# cip11 index (hardening optional)
+accept cip11 m/44'/118'/0'/0/2147483647 m/44'/118'/0'/0/2147483647
+accept cip11 m/44'/118'/0'/0/2147483647' m/44'/118'/0'/0/2147483647'
+refuse cip11 m/44'/118'/0'/0/2147483648
+refuse cip11 m/44'/118'/0'/0/2147483648'
+refuse cip11 m/44'/118'/0'/0/4294967295
+refuse cip11 m/44'/118'/0'/0/4294967295'
+
+# cip1852 m/1852'/1815'/0'/0/0
+# cip1852 purpose (fixed)
+refuse cip1852 m/2147483647/1815'/0'/0/0
+refuse cip1852 m/2147483647'/1815'/0'/0/0
+refuse cip1852 m/2147483648/1815'/0'/0/0
+refuse cip1852 m/2147483648'/1815'/0'/0/0
+refuse cip1852 m/4294967295/1815'/0'/0/0
+refuse cip1852 m/4294967295'/1815'/0'/0/0
+# cip1852 coin (fixed)
+refuse cip1852 m/1852'/2147483647/0'/0/0
+refuse cip1852 m/1852'/2147483647'/0'/0/0
+refuse cip1852 m/1852'/2147483648/0'/0/0
+refuse cip1852 m/1852'/2147483648'/0'/0/0
+refuse cip1852 m/1852'/4294967295/0'/0/0
+refuse cip1852 m/1852'/4294967295'/0'/0/0
+# cip1852 account (hardened only)
+refuse cip1852 m/1852'/1815'/2147483647/0/0
+accept cip1852 m/1852'/1815'/2147483647'/0/0 m/1852'/1815'/2147483647'/0/0
+refuse cip1852 m/1852'/1815'/2147483648/0/0
+refuse cip1852 m/1852'/1815'/2147483648'/0/0
+refuse cip1852 m/1852'/1815'/4294967295/0/0
+refuse cip1852 m/1852'/1815'/4294967295'/0/0
+# cip1852 role (soft only)
+accept cip1852 m/1852'/1815'/0'/2147483647/0 m/1852'/1815'/0'/2147483647/0
+refuse cip1852 m/1852'/1815'/0'/2147483647'/0
+refuse cip1852 m/1852'/1815'/0'/2147483648/0
+refuse cip1852 m/1852'/1815'/0'/2147483648'/0
+refuse cip1852 m/1852'/1815'/0'/4294967295/0
+refuse cip1852 m/1852'/1815'/0'/4294967295'/0
+# cip1852 index (hardening optional)
+accept cip1852 m/1852'/1815'/0'/0/2147483647 m/1852'/1815'/0'/0/2147483647
+accept cip1852 m/1852'/1815'/0'/0/2147483647' m/1852'/1815'/0'/0/2147483647'
+refuse cip1852 m/1852'/1815'/0'/0/2147483648
+refuse cip1852 m/1852'/1815'/0'/0/2147483648'
+refuse cip1852 m/1852'/1815'/0'/0/4294967295
+refuse cip1852 m/1852'/1815'/0'/0/4294967295'
+
+# zip32 m/32'/133'/0'
+# zip32 purpose (fixed)
+refuse zip32 m/2147483647/133'/0'
+refuse zip32 m/2147483647'/133'/0'
+refuse zip32 m/2147483648/133'/0'
+refuse zip32 m/2147483648'/133'/0'
+refuse zip32 m/4294967295/133'/0'
+refuse zip32 m/4294967295'/133'/0'
+# zip32 coin (fixed)
+refuse zip32 m/32'/2147483647/0'
+refuse zip32 m/32'/2147483647'/0'
+refuse zip32 m/32'/2147483648/0'
+refuse zip32 m/32'/2147483648'/0'
+refuse zip32 m/32'/4294967295/0'
+refuse zip32 m/32'/4294967295'/0'
+# zip32 account (hardened only)
+refuse zip32 m/32'/133'/2147483647
+accept zip32 m/32'/133'/2147483647' m/32'/133'/2147483647'
+refuse zip32 m/32'/133'/2147483648
+refuse zip32 m/32'/133'/2147483648'
+refuse zip32 m/32'/133'/4294967295
+refuse zip32 m/32'/133'/4294967295'
+
+# zip32 m/32'/133'/0'/0
+# zip32 purpose (fixed)
+refuse zip32 m/2147483647/133'/0'/0
+refuse zip32 m/2147483647'/133'/0'/0
+refuse zip32 m/2147483648/133'/0'/0
+refuse zip32 m/2147483648'/133'/0'/0
+refuse zip32 m/4294967295/133'/0'/0
+refuse zip32 m/4294967295'/133'/0'/0
+# zip32 coin (fixed)
+refuse zip32 m/32'/2147483647/0'/0
+refuse zip32 m/32'/2147483647'/0'/0
+refuse zip32 m/32'/2147483648/0'/0
+refuse zip32 m/32'/2147483648'/0'/0
+refuse zip32 m/32'/4294967295/0'/0
+refuse zip32 m/32'/4294967295'/0'/0
+# zip32 account (hardened only)
+refuse zip32 m/32'/133'/2147483647/0
+accept zip32 m/32'/133'/2147483647'/0 m/32'/133'/2147483647'/0
+refuse zip32 m/32'/133'/2147483648/0
+refuse zip32 m/32'/133'/2147483648'/0
+refuse zip32 m/32'/133'/4294967295/0
+refuse zip32 m/32'/133'/4294967295'/0
+# zip32 index (hardening optional)
+accept zip32 m/32'/133'/0'/2147483647 m/32'/133'/0'/2147483647
+accept zip32 m/32'/133'/0'/2147483647' m/32'/133'/0'/2147483647'
+refuse zip32 m/32'/133'/0'/2147483648
+refuse zip32 m/32'/133'/0'/2147483648'
+refuse zip32 m/32'/133'/0'/4294967295
+refuse zip32 m/32'/133'/0'/4294967295'
+
+# slip10 m/44'/501'/0'/0'
+# slip10 level 0 (hardening optional)
+accept slip10 m/2147483647/501'/0'/0' m/2147483647/501'/0'/0'
+accept slip10 m/2147483647'/501'/0'/0' m/2147483647'/501'/0'/0'
+refuse slip10 m/2147483648/501'/0'/0'
+refuse slip10 m/2147483648'/501'/0'/0'
+refuse slip10 m/4294967295/501'/0'/0'
+refuse slip10 m/4294967295'/501'/0'/0'
+# slip10 level 1 (hardening optional)
+accept slip10 m/44'/2147483647/0'/0' m/44'/2147483647/0'/0'
+accept slip10 m/44'/2147483647'/0'/0' m/44'/2147483647'/0'/0'
+refuse slip10 m/44'/2147483648/0'/0'
+refuse slip10 m/44'/2147483648'/0'/0'
+refuse slip10 m/44'/4294967295/0'/0'
+refuse slip10 m/44'/4294967295'/0'/0'
+# slip10 level 2 (hardening optional)
+accept slip10 m/44'/501'/2147483647/0' m/44'/501'/2147483647/0'
+accept slip10 m/44'/501'/2147483647'/0' m/44'/501'/2147483647'/0'
+refuse slip10 m/44'/501'/2147483648/0'
+refuse slip10 m/44'/501'/2147483648'/0'
+refuse slip10 m/44'/501'/4294967295/0'
+refuse slip10 m/44'/501'/4294967295'/0'
+# slip10 level 3 (hardening optional)
+accept slip10 m/44'/501'/0'/2147483647 m/44'/501'/0'/2147483647
+accept slip10 m/44'/501'/0'/2147483647' m/44'/501'/0'/2147483647'
+refuse slip10 m/44'/501'/0'/2147483648
+refuse slip10 m/44'/501'/0'/2147483648'
+refuse slip10 m/44'/501'/0'/4294967295
+refuse slip10 m/44'/501'/0'/4294967295'
+
+# slip10 m/0
+# slip10 level 0 (hardening optional)
+accept slip10 m/2147483647 m/2147483647
+accept slip10 m/2147483647' m/2147483647'
+refuse slip10 m/2147483648
+refuse slip10 m/2147483648'
+refuse slip10 m/4294967295
+refuse slip10 m/4294967295'
+
+# Hardened markers h and H count like ' and are emitted as '.
+accept bip44 m/44h/60H/2147483647h/0/2147483647H m/44'/60'/2147483647'/0/2147483647'
+refuse bip44 m/44'/60'/2147483648h/0/0
+refuse bip44 m/44'/60'/0'/0/2147483648H
+accept slip10 m/2147483647h/2147483647H/2147483647 m/2147483647'/2147483647'/2147483647
+refuse slip10 m/2147483647h/2147483648H
+
+# Beyond 32 bits.
+refuse bip44 m/44'/60'/0'/0/4294967296
+refuse bip44 m/44'/60'/0'/0/18446744073709551616
+refuse slip10 m/99999999999999999999
+refuse slip10 m/0/99999999999999999999'
+
+# Leading zeros. A variable level accepts them and the canonical form drops
+# them; the range check applies to the value. A fixed level (purpose, the
+# fixed coin of cip11/cip1852/zip32, the 0|1 charge of bip32 and the
+# BIP-44 family) must be spelled exactly as in its template.
+accept bip44 m/44'/060'/0'/0/0 m/44'/60'/0'/0/0
+accept bip44 m/44'/60'/00'/0/00 m/44'/60'/0'/0/0
+accept bip44 m/44'/60'/0'/0/02147483647 m/44'/60'/0'/0/2147483647
+accept bip44 m/44'/60'/0'/0/000000000000000000002147483647' m/44'/60'/0'/0/2147483647'
+refuse bip44 m/44'/60'/0'/0/02147483648
+refuse bip44 m/44'/60'/000000000000000000002147483648'/0/0
+refuse bip44 m/044'/60'/0'/0/0
+refuse bip44 m/44'/60'/0'/00/0
+refuse bip44 m/44'/60'/0'/01/0
+refuse bip84 m/084'/0'/0'/0/0
+refuse bip32 m/0'/00/0
+accept bip32 m/00'/1/007' m/0'/1/7'
+refuse cip11 m/044'/118'/0'/0/0
+refuse cip11 m/44'/0118'/0'/0/0
+accept cip11 m/44'/118'/0'/09/0 m/44'/118'/0'/9/0
+refuse cip1852 m/01852'/1815'/0'/0/0
+refuse cip1852 m/1852'/01815'/0'/0/0
+accept cip1852 m/1852'/1815'/0'/02/0 m/1852'/1815'/0'/2/0
+refuse zip32 m/032'/133'/0'
+refuse zip32 m/32'/0133'/0'
+accept zip32 m/32'/133'/00'/00' m/32'/133'/0'/0'
+accept slip10 m/044'/0501'/00' m/44'/501'/0'

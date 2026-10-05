@@ -65,6 +65,8 @@ type AccountIndex uint32
 // CIP-1852 role take any index.
 type ChargeType uint32
 
+// AddressIndex is one level of a derivation path. Index is below 2^31 in
+// every parsed path; IsHardened is the separate hardened flag.
 type AddressIndex struct {
 	Index      uint32
 	IsHardened bool
@@ -291,8 +293,11 @@ func (dp *DerivationPath) ParsePath(path string) error {
 		return fmt.Errorf("%w: %q", ErrInvalidDerivationPath, path)
 	}
 
+	// A level's index has 31 bits: a BIP-32 child number keeps the hardened
+	// flag in its top bit (n' is 2^31+n), so an index of 2^31 or more would
+	// name another level's key. Refused at every level, hardened or not.
 	parseUint := func(s, label string) (uint32, error) {
-		v, err := strconv.ParseUint(s, 10, 32)
+		v, err := strconv.ParseUint(s, 10, 31)
 		if err != nil {
 			return 0, fmt.Errorf("%w: cannot parse %s %q: %s", ErrInvalidDerivationPath, label, s, err)
 		}

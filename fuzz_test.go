@@ -69,10 +69,10 @@ func FuzzParseURN(f *testing.F) {
 func FuzzDerivationPath(f *testing.F) {
 	// Seeds: one valid path per known derivation type plus a few degenerate
 	// inputs that have historically been weak spots (variable-length ZIP-32,
-	// SLIP-10 with mixed hardening, hardened leaf, max-uint32 indices, etc).
+	// SLIP-10 with mixed hardening, hardened leaf, the largest index, etc).
 	seeds := []struct{ dt, path string }{
 		{"bip32", "m/0'/0/0"},
-		{"bip32", "m/2147483647'/1/4294967295'"},
+		{"bip32", "m/2147483647'/1/2147483647'"}, // largest index, 2^31-1
 		{"bip44", "m/44'/60'/0'/0/0"},
 		{"bip44", "m/44'/0'/0'/0/0'"}, // hardened leaf
 		{"bip49", "m/49'/0'/0'/0/0"},
@@ -96,7 +96,9 @@ func FuzzDerivationPath(f *testing.F) {
 		{"bip44", "m/44'/0'/0'/0"}, // missing leaf
 		{"slip10", "m"},
 		{"slip10", "m/"},
-		{"slip10", "m/99999999999999999999"}, // overflow
+		{"slip10", "m/99999999999999999999"},   // overflow
+		{"bip32", "m/2147483648'/1/0"},         // index 2^31
+		{"bip44", "m/44'/60'/0'/0/4294967295"}, // index 2^32-1
 		{"unknown", "m/0/0/0"},
 	}
 	for _, s := range seeds {
@@ -122,6 +124,13 @@ func FuzzDerivationPath(f *testing.F) {
 		if dp2.String() != serialized {
 			t.Fatalf("not idempotent:\n once:  %s\n twice: %s\n input: dt=%q path=%q",
 				serialized, dp2.String(), dt, path)
+		}
+
+		// No accepted level may carry an index of 2^31 or more.
+		for i, lvl := range dp.Levels() {
+			if lvl.Index > 1<<31-1 {
+				t.Fatalf("level[%d] = %d is above 2^31-1 (input: dt=%q path=%q)", i, lvl.Index, dt, path)
+			}
 		}
 
 		// Levels() must always be safe to call (may be empty for ROOT).

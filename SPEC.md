@@ -231,7 +231,7 @@ protocol messages.
 | bip74    | `m/74'/coin'/account'/charge/index[']`                | 5       | sui-keys/src/key_derive.rs (Sui secp256r1)                             |
 | bip84    | `m/84'/coin'/account'/charge/index[']`                | 5       | https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki         |
 | bip86    | `m/86'/coin'/account'/charge/index[']`                | 5       | https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki         |
-| slip10   | `m(/uint32['])+`  (variable length)                   | 1+      | https://github.com/satoshilabs/slips/blob/master/slip-0010.md          |
+| slip10   | `m(/index['])+`  (variable length)                    | 1+      | https://github.com/satoshilabs/slips/blob/master/slip-0010.md          |
 | cip11    | `m/44'/118'/account'/charge_extra/index[']`           | 5       | https://github.com/confio/cosmos-hd-key-derivation-spec                |
 | cip1852  | `m/1852'/1815'/account'/role/index[']`                | 5       | https://github.com/cardano-foundation/CIPs/blob/master/CIP-1852/       |
 | zip32    | `m/32'/133'/account'[/index[']]`                      | 3 or 4  | https://zips.z.cash/zip-0032                                           |
@@ -239,6 +239,17 @@ protocol messages.
 Hardening markers in input: `'`, `H`, or `h` are all accepted and normalised
 to `'` in canonical output. The trailing `[']` on `index` denotes that the
 leaf level itself may be hardened.
+
+Each level's index is 0..2^31-1 (at most `2147483647`); the hardened marker
+is a separate flag, so `n'` is BIP-32 child number 2^31+n. An index of 2^31
+or more is refused at every level of every derivation type, hardened or not:
+it collides with the hardened bit and would name the key of another path.
+
+Leading zeros are accepted in a variable level and dropped in canonical
+output (`m/44'/060'/0'/0/0` is `m/44'/60'/0'/0/0`); the range applies to the
+value. A fixed level (the purpose, the fixed coin of `cip11`, `cip1852` and
+`zip32`, the `0`/`1` charge of `bip32` and the BIP-44 family) must be spelled
+exactly as in the template.
 
 ### 3.1 Variable-length paths
 
@@ -302,7 +313,8 @@ Performs structural validation only:
   whitespace around the whole URN is trimmed).
 - Chain ID is non-empty.
 - Derivation type, if present, is one of the registered constants.
-- Derivation path, if present, matches the regex of its derivation type.
+- Derivation path, if present, matches the regex of its derivation type,
+  and every level's index is below 2^31 (§3).
 - Algorithm, if present, is one of the registered constants.
 - Format, if present, is one of the registered constants.
 
@@ -348,7 +360,7 @@ text.
 | `ErrInvalidChainKey`         | `ChainFromKey` input is not the canonical identity form  |
 | `ErrInvalidValue`            | Free-form setter value with `:`/`?`/`#`/whitespace       |
 | `ErrInvalidDerivationType`   | `dt` value not registered                                |
-| `ErrInvalidDerivationPath`   | `dp` does not match the regex of `dt`                    |
+| `ErrInvalidDerivationPath`   | `dp` does not match `dt`, or a level index is >= 2^31    |
 | `ErrInvalidAlgorithm`        | `aa` value not registered                                |
 | `ErrInvalidFormat`           | `af` value not registered                                |
 | `ErrIncompatible`            | Strict validation: triple not allowed for the network    |
