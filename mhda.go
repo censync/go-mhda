@@ -327,8 +327,8 @@ func (a *Address) NSS() string {
 		_, _ = fmt.Fprintf(&b, ":ct:%d", a.chain.coinType)
 	}
 
-	// Derivation domain - present when not ROOT.
-	if a.path != nil && a.path.derivationType != ROOT {
+	// Derivation domain - present when a type other than ROOT is set.
+	if a.path != nil && a.path.derivationType != ROOT && a.path.derivationType != "" {
 		b.WriteString(":dt:")
 		b.WriteString(string(a.path.derivationType))
 		b.WriteString(":dp:")

@@ -25,8 +25,23 @@ type Chain struct {
 	hasCoinType bool
 }
 
+// NewChain builds a chain from a registered network type and a chain id.
+// Both are written verbatim into every URN and chain key, so they are
+// validated like parsed input: the network type must be one of the
+// registered constants, and the chain id (ASCII-trimmed) must be non-empty
+// printable ASCII without ':', '?' or '#' - a ':' would inject components on
+// re-parse. An invalid value panics (programmer error at a construction
+// site, as with NewAddress). For untrusted input use SetNetworkType /
+// SetChainId, which return the error, or ChainFromKey.
 func NewChain(networkType NetworkType, chainId ChainId) *Chain {
-	return &Chain{networkType: networkType, chainId: chainId}
+	c := &Chain{}
+	if err := c.SetNetworkType(networkType); err != nil {
+		panic(err)
+	}
+	if err := c.SetChainId(chainId); err != nil {
+		panic(err)
+	}
+	return c
 }
 
 // ChainFromKey parses a Chain from a key produced by Chain.Key(). A chain key
@@ -131,8 +146,31 @@ func parseCoinType(s string) (CoinType, error) {
 	return CoinType(v), nil
 }
 
-func (c *Chain) SetNetworkType(networkType NetworkType) { c.networkType = networkType }
-func (c *Chain) SetChainId(chainId ChainId)             { c.chainId = chainId }
+// SetNetworkType sets the network type. It must be one of the registered
+// constants (ErrInvalidNetworkType); on error the chain is left unchanged.
+func (c *Chain) SetNetworkType(networkType NetworkType) error {
+	if !networkType.IsValid() {
+		return fmt.Errorf("%w: %q", ErrInvalidNetworkType, networkType)
+	}
+	c.networkType = networkType
+	return nil
+}
+
+// SetChainId sets the chain id. The value is ASCII-trimmed and must be
+// non-empty (ErrMissingChainID) printable ASCII without ':', '?' or '#'
+// (ErrInvalidValue, see validateFreeFormValue); on error the chain is left
+// unchanged.
+func (c *Chain) SetChainId(chainId ChainId) error {
+	id := asciiTrim(string(chainId))
+	if id == "" {
+		return ErrMissingChainID
+	}
+	if err := validateFreeFormValue(compChainId, id); err != nil {
+		return err
+	}
+	c.chainId = ChainId(id)
+	return nil
+}
 
 // SetCoinType attaches the optional SLIP-44 coin-type metadata.
 func (c *Chain) SetCoinType(coinType CoinType) {

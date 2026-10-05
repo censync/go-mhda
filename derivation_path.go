@@ -91,8 +91,12 @@ type DerivationPath struct {
 // 74/84/86, CIP-11, CIP-1852, ZIP-32) using the canonical "shortcut" fields.
 // For SLIP-10 (variable-length) callers must use NewDerivationPathFromLevels
 // instead - SLIP-10 cannot be reconstructed from these five fields and this
-// constructor will panic if asked to.
+// constructor will panic if asked to. An unregistered derivation type panics
+// with ErrInvalidDerivationType: the type is written verbatim into the URN.
 func NewDerivationPath(derivationType DerivationType, coin CoinType, account AccountIndex, charge ChargeType, index AddressIndex) *DerivationPath {
+	if !derivationType.IsValid() {
+		panic(fmt.Errorf("%w: %q", ErrInvalidDerivationType, derivationType))
+	}
 	if derivationType == SLIP10 {
 		panic("mhda: NewDerivationPath cannot construct SLIP10 paths; use NewDerivationPathFromLevels")
 	}
@@ -114,8 +118,12 @@ func NewDerivationPath(derivationType DerivationType, coin CoinType, account Acc
 //
 // For BIP-family schemes the shortcut fields (coin/account/charge/index) are
 // populated from the levels so subsequent String() and getter calls behave the
-// same as if the path had been parsed.
+// same as if the path had been parsed. An unregistered derivation type panics
+// with ErrInvalidDerivationType.
 func NewDerivationPathFromLevels(derivationType DerivationType, levels []AddressIndex) *DerivationPath {
+	if !derivationType.IsValid() {
+		panic(fmt.Errorf("%w: %q", ErrInvalidDerivationType, derivationType))
+	}
 	cp := make([]AddressIndex, len(levels))
 	copy(cp, levels)
 	dp := &DerivationPath{

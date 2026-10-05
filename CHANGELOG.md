@@ -32,6 +32,20 @@ of 2^31 or more no longer parses.
   refused in a fixed level (the purpose, the fixed coin of `cip11`,
   `cip1852` and `zip32`, the `0`/`1` charge of `bip32` and the BIP-44
   family).
+- **Programmatic values are validated like parsed input.** The network
+  type, the chain id and the derivation type are written verbatim into
+  every URN, and nothing checked them when set in code: a chain id
+  `1:dt:bip44:dp:m/44'/60'/0'/0/666` on a root address produced a URN that
+  re-parsed as a bip44 path. `NewChain` now requires a registered network
+  type and a non-empty chain id of printable ASCII without `:`, `?` or `#`
+  (ASCII-trimmed) and panics otherwise, like `NewAddress`.
+  `Chain.SetNetworkType` and `Chain.SetChainId` return an error
+  (`ErrInvalidNetworkType`, `ErrMissingChainID`, `ErrInvalidValue`) and
+  leave the chain unchanged; they returned nothing before.
+  `NewDerivationPath` and `NewDerivationPathFromLevels` panic with
+  `ErrInvalidDerivationType` on an unregistered type. An `Address` whose
+  path has no type serialises like a root address instead of emitting
+  empty `dt`/`dp` components.
 
 ### Fixed
 

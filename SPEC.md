@@ -358,7 +358,7 @@ text.
 | `ErrMissingChainID`          | `ci` absent                                              |
 | `ErrCoinTypeInChainKey`      | `ChainFromKey` input carries `ct` (pre-1.1 key format)   |
 | `ErrInvalidChainKey`         | `ChainFromKey` input is not the canonical identity form  |
-| `ErrInvalidValue`            | Free-form setter value with `:`/`?`/`#`/whitespace       |
+| `ErrInvalidValue`            | Free-form or chain id value with `:`/`?`/`#`/whitespace  |
 | `ErrInvalidDerivationType`   | `dt` value not registered                                |
 | `ErrInvalidDerivationPath`   | `dp` does not match `dt`, or a level index is >= 2^31    |
 | `ErrInvalidAlgorithm`        | `aa` value not registered                                |
@@ -409,6 +409,16 @@ with its own factory functions:
 | `NewChain(nt, ci)`         | Programmatic construction.                               |
 | `ChainFromNSS(s string)`   | Extract the chain domain from any NSS (lenient).         |
 | `ChainFromKey(key)`        | Parse a `ChainKey` (alias of string) produced by `Key()`.|
+
+Values set programmatically are written verbatim into every URN and chain
+key, so they are validated like parsed input. `NewChain`,
+`Chain.SetNetworkType` and `Chain.SetChainId` require a registered network
+type and a non-empty chain id (ASCII-trimmed) of printable ASCII without
+`:`, `?` or `#`; a `:` would otherwise inject components on re-parse.
+`NewChain` panics on an invalid value; the setters return
+`ErrInvalidNetworkType`, `ErrMissingChainID` or `ErrInvalidValue` and leave
+the chain unchanged. `NewDerivationPath` and `NewDerivationPathFromLevels`
+panic with `ErrInvalidDerivationType` on an unregistered derivation type.
 
 `Chain.String()` and `Chain.Key()` both return the canonical chain key
 `nt:<network>:ci:<chainid>`, suitable for use as a map key, cache key or
