@@ -1,15 +1,31 @@
 package go_mhda
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
 
-// normalize trims surrounding whitespace and lowercases the input. Used
-// throughout the package to canonicalise component values (network type,
-// algorithm, format, derivation type) before lookup.
+// normalize trims surrounding ASCII whitespace and lowercases ASCII letters.
+// Used throughout the package to canonicalise component values (network
+// type, algorithm, format, derivation type) before lookup. ASCII only, like
+// the URN parser and the C++ port: an NSS is ASCII (RFC 8141), so a Unicode
+// space or a letter that lowercases to ASCII (the Kelvin sign) is malformed
+// input, not another spelling.
 func normalize(s string) string {
-	return strings.ToLower(strings.TrimSpace(s))
+	return asciiLower(asciiTrim(s))
+}
+
+// asciiLower lowercases the ASCII letters of s and leaves every other byte.
+func asciiLower(s string) string {
+	for i := 0; i < len(s); i++ {
+		if 'A' <= s[i] && s[i] <= 'Z' {
+			b := []byte(s)
+			for j := i; j < len(b); j++ {
+				if 'A' <= b[j] && b[j] <= 'Z' {
+					b[j] += 'a' - 'A'
+				}
+			}
+			return string(b)
+		}
+	}
+	return s
 }
 
 const (

@@ -77,7 +77,7 @@ var knownComponents = func() map[string]struct{} {
 // RFC 8141 §5.1: the leading "urn:" sequence and the NID are case-insensitive
 // (e.g. "URN:MHDA:..." must parse identically to "urn:mhda:...").
 func hasPrefixFold(s, prefix string) bool {
-	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
+	return len(s) >= len(prefix) && asciiLower(s[:len(prefix)]) == asciiLower(prefix)
 }
 
 // asciiTrim trims ASCII whitespace only. Unicode spaces (NBSP, ideographic
@@ -220,7 +220,7 @@ func parseNSS(nss string) (map[string]string, error) {
 			return nil, err
 		}
 		if _, ok := knownComponents[key]; !ok {
-			if _, ok := knownComponents[strings.ToLower(key)]; ok {
+			if _, ok := knownComponents[asciiLower(key)]; ok {
 				return nil, fmt.Errorf("%w: component key %q must be lowercase", ErrInvalidNSS, key)
 			}
 			continue // unknown component, skipped with its value

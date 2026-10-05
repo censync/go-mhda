@@ -104,7 +104,9 @@ NSS values must consist of ASCII characters allowed by RFC 8141 NSS production
 ASCII (0x21–0x7E) for every value: control bytes, whitespace of any kind and
 non-ASCII bytes are rejected. Only ASCII whitespace is trimmed around the URN
 and around values — a Unicode space is malformed input, never decoration to
-strip. Percent-encoding is not implemented; if a value needs to contain `:`
+strip. The setters and the `...FromString` helpers follow the same rule:
+they trim ASCII whitespace and fold ASCII case only, so a Unicode letter that
+lowercases to an ASCII one (the Kelvin sign `K`) is not another spelling. Percent-encoding is not implemented; if a value needs to contain `:`
 (currently no in-tree value does), percent-encoding support must be added.
 
 ### 1.6 Wallet domain

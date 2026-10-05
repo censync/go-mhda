@@ -303,3 +303,41 @@ func TestFromStringHelpersWrapSentinels(t *testing.T) {
 		t.Errorf("DerivationTypeFromString: got %v, want ErrInvalidDerivationType", err)
 	}
 }
+
+// TestNormalisationIsASCIIOnly: setters and lookup helpers trim ASCII
+// whitespace and lowercase ASCII letters only, like the URN parser and the
+// C++ port. A Unicode space is not trimmed and a letter that lowercases to
+// ASCII (the Kelvin sign) is not folded: both are malformed input.
+func TestNormalisationIsASCIIOnly(t *testing.T) {
+	const kelvin, nbsp, ideo = "K", " ", "　"
+	addr := mustAddress(t, `urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0`)
+	for name, err := range map[string]error{
+		"AlgorithmFromString":   func() error { _, e := AlgorithmFromString("secp256" + kelvin + "1"); return e }(),
+		"FormatFromString":      func() error { _, e := FormatFromString(nbsp + "hex"); return e }(),
+		"NetworkTypeFromString": func() error { _, e := NetworkTypeFromString(nbsp + "evm"); return e }(),
+		"DerivationTypeFromStr": func() error { _, e := DerivationTypeFromString(nbsp + "BIP44"); return e }(),
+		"SetAddressAlgorithm":   addr.SetAddressAlgorithm("secp256" + kelvin + "1"),
+		"SetAddressFormat":      addr.SetAddressFormat(nbsp + "hex" + nbsp),
+		"SetDerivationType":     addr.SetDerivationType("bip44" + ideo),
+		"SetDerivationPath":     addr.SetDerivationPath(nbsp + "m/44'/60'/0'/0/1"),
+		"SetCoinType":           addr.SetCoinType(nbsp + "60"),
+	} {
+		if err == nil {
+			t.Errorf("%s accepted a non-ASCII spelling", name)
+		}
+	}
+	if got := addr.String(); got != `urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0` {
+		t.Errorf("refused values changed the address: %q", got)
+	}
+
+	// ASCII whitespace and case are still normalised.
+	if a, err := AlgorithmFromString(" SECP256K1\t"); err != nil || a != Secp256k1 {
+		t.Errorf("AlgorithmFromString: %q, %v", a, err)
+	}
+	if nt, err := NetworkTypeFromString("\tEVM "); err != nil || nt != EthereumVM {
+		t.Errorf("NetworkTypeFromString: %q, %v", nt, err)
+	}
+	if err := addr.SetDerivation(" BIP44 ", " M/44H/60H/0H/0/1 "); err != nil {
+		t.Errorf("SetDerivation with ASCII case and spaces: %v", err)
+	}
+}

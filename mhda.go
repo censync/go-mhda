@@ -160,8 +160,7 @@ func (a *Address) Format() Format {
 // Setting the current type again keeps the path. Use SetDerivation to change
 // both at once.
 func (a *Address) SetDerivationType(dt string) error {
-	dt = strings.TrimSpace(dt)
-	dt = strings.ToLower(dt)
+	dt = normalize(dt)
 
 	next := ROOT
 	if dt != `` {
@@ -199,7 +198,7 @@ func (a *Address) SetDerivation(dt, dp string) error {
 // path it spells out.
 func (a *Address) SetDerivationPath(dp string) error {
 	if a.path == nil || a.path.derivationType == ROOT {
-		if p := strings.TrimSpace(dp); p != `` {
+		if p := asciiTrim(dp); p != `` {
 			return fmt.Errorf("%w: root derivation must have empty path, got %q", ErrInvalidDerivationPath, p)
 		}
 		return nil
@@ -210,8 +209,7 @@ func (a *Address) SetDerivationPath(dp string) error {
 		return fmt.Errorf("%w: unknown derivation type %q", ErrInvalidDerivationPath, a.path.derivationType)
 	}
 
-	dp = strings.TrimSpace(dp)
-	dp = strings.ToLower(dp)
+	dp = normalize(dp)
 
 	if !rx.MatchString(dp) {
 		return fmt.Errorf("%w: %q", ErrInvalidDerivationPath, dp)
@@ -230,7 +228,7 @@ func (a *Address) SetCoinType(ct string) error {
 	if a.chain == nil {
 		return ErrUninitializedAddress
 	}
-	ct = strings.TrimSpace(ct)
+	ct = asciiTrim(ct)
 	if ct == `` {
 		a.chain.ClearCoinType()
 		return nil
@@ -261,8 +259,7 @@ func validateFreeFormValue(component, v string) error {
 }
 
 func (a *Address) SetAddressAlgorithm(aa string) error {
-	aa = strings.TrimSpace(aa)
-	aa = strings.ToLower(aa)
+	aa = normalize(aa)
 	if aa == `` {
 		a.addressAlgorithm = ""
 		return nil
@@ -275,8 +272,7 @@ func (a *Address) SetAddressAlgorithm(aa string) error {
 }
 
 func (a *Address) SetAddressFormat(af string) error {
-	af = strings.TrimSpace(af)
-	af = strings.ToLower(af)
+	af = normalize(af)
 	if af == `` {
 		a.addressFormat = ""
 		return nil

@@ -111,7 +111,7 @@ func parseChain(m map[string]string) (*Chain, error) {
 	}
 
 	chainID, ok := m[compChainId]
-	if !ok || strings.TrimSpace(chainID) == "" {
+	if !ok || asciiTrim(chainID) == "" {
 		return nil, ErrMissingChainID
 	}
 
@@ -121,7 +121,7 @@ func parseChain(m map[string]string) (*Chain, error) {
 	}
 
 	if ct, ok := m[compCoinType]; ok {
-		coinType, err := parseCoinType(strings.TrimSpace(ct))
+		coinType, err := parseCoinType(asciiTrim(ct))
 		if err != nil {
 			return nil, err
 		}

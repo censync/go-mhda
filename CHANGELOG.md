@@ -120,6 +120,13 @@ of 2^31 or more no longer parses.
   `errors.New` values, so `errors.Is` could not tell them apart, unlike
   `DerivationTypeFromString` and the parsers. They now wrap
   `ErrInvalidAlgorithm`, `ErrInvalidFormat` and `ErrInvalidNetworkType`.
+- **Setters and lookup helpers normalise ASCII only.** They trimmed with
+  `strings.TrimSpace` and lowercased with `strings.ToLower`, which are
+  Unicode-aware: `SetAddressAlgorithm("secp256\u212a1")` (Kelvin sign)
+  was accepted as `secp256k1`, and NBSP or ideographic spaces around a
+  derivation type, path, format or coin type were trimmed, while the URN
+  parser and the C++ port refuse the same bytes. They now trim ASCII
+  whitespace and fold ASCII case only.
 - **No stale or mixed derivation state.** `ParsePath` updated the fields
   of the path it was given: re-parsing a 4-level ZIP-32 path with a 3-level
   one kept the old index (`m/32'/133'/1'` read back as `m/32'/133'/1'/5`),
