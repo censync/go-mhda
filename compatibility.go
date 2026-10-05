@@ -15,8 +15,9 @@ var ErrIncompatible = errors.New("mhda: incompatible network/algorithm/format")
 // defaults to apply when the URN omits the optional aa/af components.
 //
 // "format zero-value" (empty Format) is allowed for networks that have many
-// reasonable choices (e.g. Bitcoin: legacy, segwit, taproot) - in that case
-// the URN must spell the format out explicitly to use Strict mode.
+// reasonable choices (e.g. Bitcoin: legacy, segwit, taproot); a URN for one
+// of them may omit af, and an af it spells out must match the purpose
+// (derivationFormats).
 //
 // ROOT is implicitly accepted for every registered network; it represents
 // the non-HD form (no derivation path) and is always structurally valid.
@@ -26,6 +27,12 @@ type networkCompat struct {
 	derivations      map[DerivationType]struct{}
 	defaultAlgorithm Algorithm
 	defaultFormat    Format
+	// derivationAlgorithm binds a derivation type to the one algorithm it
+	// derives on this network; unbound types take any listed algorithm.
+	derivationAlgorithm map[DerivationType]Algorithm
+	// derivationFormats binds a derivation type to the formats its purpose
+	// defines, checked when a format is resolved; unbound types take any.
+	derivationFormats map[DerivationType]map[Format]struct{}
 }
 
 var networkCompatibility = map[NetworkType]networkCompat{
@@ -34,7 +41,14 @@ var networkCompatibility = map[NetworkType]networkCompat{
 		formats:          set(P2PKH, P2SH, P2WPKH, P2WSH, P2TR, Bech32, Bech32m),
 		derivations:      set(BIP32, BIP44, BIP49, BIP84, BIP86),
 		defaultAlgorithm: Secp256k1,
-		// no default format: BTC has multiple legitimate scripts
+		// no default format: BTC has multiple legitimate scripts. The
+		// purpose defines the script, so an explicit format must match it.
+		derivationFormats: map[DerivationType]map[Format]struct{}{
+			BIP44: set(P2PKH),
+			BIP49: set(P2SH),
+			BIP84: set(P2WPKH, Bech32),
+			BIP86: set(P2TR, Bech32m),
+		},
 	},
 	EthereumVM: {
 		algorithms:       set(Secp256k1),
@@ -101,6 +115,10 @@ var networkCompatibility = map[NetworkType]networkCompat{
 		derivations:      set(SLIP10, BIP44),
 		defaultAlgorithm: Ed25519,
 		defaultFormat:    HEX,
+		derivationAlgorithm: map[DerivationType]Algorithm{
+			SLIP10: Ed25519,
+			BIP44:  Secp256k1,
+		},
 	},
 	// Aptos. The Aptos TS SDK enforces two distinct path shapes:
 	//   ed25519:   m/44'/637'/account'/change'/index'  (all 5 hardened)
@@ -113,6 +131,10 @@ var networkCompatibility = map[NetworkType]networkCompat{
 		derivations:      set(SLIP10, BIP44),
 		defaultAlgorithm: Ed25519,
 		defaultFormat:    HEX,
+		derivationAlgorithm: map[DerivationType]Algorithm{
+			SLIP10: Ed25519,
+			BIP44:  Secp256k1,
+		},
 	},
 	// Sui. Three signature schemes, distinguished by the purpose field of
 	// the derivation path (sui-keys/src/key_derive.rs):
@@ -127,6 +149,11 @@ var networkCompatibility = map[NetworkType]networkCompat{
 		derivations:      set(SLIP10, BIP54, BIP74),
 		defaultAlgorithm: Ed25519,
 		defaultFormat:    HEX,
+		derivationAlgorithm: map[DerivationType]Algorithm{
+			SLIP10: Ed25519,
+			BIP54:  Secp256k1,
+			BIP74:  Secp256r1,
+		},
 	},
 	// Cardano (ADA). Single-curve protocol using BIP32-Ed25519 (extended
 	// keys, soft derivation supported - distinct from SLIP-10 ed25519).
@@ -203,6 +230,9 @@ func (a *Address) Validate() error {
 	if a == nil || a.chain == nil {
 		return ErrUninitializedAddress
 	}
+	if err := a.checkPathSet(); err != nil {
+		return err
+	}
 	compat, ok := networkCompatibility[a.chain.networkType]
 	if !ok {
 		return fmt.Errorf("%w: unknown network type %q", ErrIncompatible, a.chain.networkType)
@@ -226,11 +256,40 @@ func (a *Address) Validate() error {
 
 	// ROOT (no derivation path) is always permitted; it represents the non-HD
 	// form. Any other derivation type must be in the per-network whitelist.
-	if a.path != nil && a.path.derivationType != ROOT {
-		if _, ok := compat.derivations[a.path.derivationType]; !ok {
-			return fmt.Errorf("%w: derivation %q not allowed for network %q",
-				ErrIncompatible, a.path.derivationType, a.chain.networkType)
+	if a.path == nil || a.path.derivationType == ROOT || a.path.derivationType == "" {
+		return nil
+	}
+	dt := a.path.derivationType
+	if _, ok := compat.derivations[dt]; !ok {
+		return fmt.Errorf("%w: derivation %q not allowed for network %q",
+			ErrIncompatible, dt, a.chain.networkType)
+	}
+	if want, ok := compat.derivationAlgorithm[dt]; ok && algo != want {
+		return fmt.Errorf("%w: derivation %q derives %q keys on network %q, not %q",
+			ErrIncompatible, dt, want, a.chain.networkType, algo)
+	}
+	if formats, ok := compat.derivationFormats[dt]; ok {
+		if format := a.Format(); format != "" {
+			if _, ok := formats[format]; !ok {
+				return fmt.Errorf("%w: format %q does not match the purpose of derivation %q on network %q",
+					ErrIncompatible, format, dt, a.chain.networkType)
+			}
 		}
+	}
+	// SLIP-10 derives ed25519 keys through hardened levels only; CIP-1852
+	// (BIP32-Ed25519) is the one ed25519 scheme with soft derivation.
+	if algo == Ed25519 && dt != CIP1852 {
+		for i, lvl := range a.path.levels {
+			if !lvl.IsHardened {
+				return fmt.Errorf("%w: ed25519 derives hardened levels only, level %d of %q is not hardened",
+					ErrIncompatible, i, a.path.String())
+			}
+		}
+	}
+	// On Cosmos, bip44 with coin 118' is the cip11 path under another name;
+	// strict mode keeps the one spelling.
+	if a.chain.networkType == Cosmos && dt == BIP44 && a.path.coin == ATOM {
+		return fmt.Errorf("%w: %q with coin 118' is the cip11 path, use dt:cip11", ErrIncompatible, dt)
 	}
 
 	return nil

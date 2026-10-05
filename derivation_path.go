@@ -59,8 +59,18 @@ func DerivationTypeFromString(src string) (DerivationType, error) {
 
 type AccountIndex uint32
 
-type ChargeType uint8
+// maxSlip10Depth is the deepest SLIP-10 path: BIP-32 serialises a key's depth
+// in one byte.
+const maxSlip10Depth = 255
 
+// ChargeType is the level after the account: the change level of BIP-32 and
+// the BIP-44 family (0 external, 1 internal), the CIP-11 charge and the
+// CIP-1852 role. It is as wide as a level index: the CIP-11 charge and the
+// CIP-1852 role take any index.
+type ChargeType uint32
+
+// AddressIndex is one level of a derivation path. Index is below 2^31 in
+// every parsed path; IsHardened is the separate hardened flag.
 type AddressIndex struct {
 	Index      uint32
 	IsHardened bool
@@ -85,8 +95,12 @@ type DerivationPath struct {
 // 74/84/86, CIP-11, CIP-1852, ZIP-32) using the canonical "shortcut" fields.
 // For SLIP-10 (variable-length) callers must use NewDerivationPathFromLevels
 // instead - SLIP-10 cannot be reconstructed from these five fields and this
-// constructor will panic if asked to.
+// constructor will panic if asked to. An unregistered derivation type panics
+// with ErrInvalidDerivationType: the type is written verbatim into the URN.
 func NewDerivationPath(derivationType DerivationType, coin CoinType, account AccountIndex, charge ChargeType, index AddressIndex) *DerivationPath {
+	if !derivationType.IsValid() {
+		panic(fmt.Errorf("%w: %q", ErrInvalidDerivationType, derivationType))
+	}
 	if derivationType == SLIP10 {
 		panic("mhda: NewDerivationPath cannot construct SLIP10 paths; use NewDerivationPathFromLevels")
 	}
@@ -99,7 +113,7 @@ func NewDerivationPath(derivationType DerivationType, coin CoinType, account Acc
 		hasIndex:       derivationType != ROOT,
 	}
 	dp.rebuildLevels()
-	return dp
+	return reparsed(dp, dp.levels)
 }
 
 // NewDerivationPathFromLevels constructs a path from an explicit sequence of
@@ -108,8 +122,12 @@ func NewDerivationPath(derivationType DerivationType, coin CoinType, account Acc
 //
 // For BIP-family schemes the shortcut fields (coin/account/charge/index) are
 // populated from the levels so subsequent String() and getter calls behave the
-// same as if the path had been parsed.
+// same as if the path had been parsed. An unregistered derivation type panics
+// with ErrInvalidDerivationType.
 func NewDerivationPathFromLevels(derivationType DerivationType, levels []AddressIndex) *DerivationPath {
+	if !derivationType.IsValid() {
+		panic(fmt.Errorf("%w: %q", ErrInvalidDerivationType, derivationType))
+	}
 	cp := make([]AddressIndex, len(levels))
 	copy(cp, levels)
 	dp := &DerivationPath{
@@ -117,7 +135,38 @@ func NewDerivationPathFromLevels(derivationType DerivationType, levels []Address
 		levels:         cp,
 	}
 	dp.populateShortcutsFromLevels()
-	return dp
+	return reparsed(dp, cp)
+}
+
+// reparsed returns the path parsed back from dp.String() and panics with
+// ErrInvalidDerivationPath unless it has exactly the given levels. A
+// constructed path is then identical to a parsed one: its URN parses, and
+// Levels() never disagrees with String() (a BIP-44 path given purpose 49', an
+// unhardened account, too few levels or an index of 2^31 is refused).
+func reparsed(dp *DerivationPath, levels []AddressIndex) *DerivationPath {
+	out := &DerivationPath{derivationType: dp.derivationType}
+	if err := out.parse(dp.String()); err != nil {
+		panic(err)
+	}
+	if len(out.levels) != len(levels) {
+		panic(fmt.Errorf("%w: levels %v do not form a %s path", ErrInvalidDerivationPath, levels, dp.derivationType))
+	}
+	for i := range levels {
+		if out.levels[i] != levels[i] {
+			panic(fmt.Errorf("%w: levels %v do not form a %s path", ErrInvalidDerivationPath, levels, dp.derivationType))
+		}
+	}
+	return out
+}
+
+// clone returns a copy that shares no memory with dp.
+func (dp *DerivationPath) clone() *DerivationPath {
+	if dp == nil {
+		return nil
+	}
+	c := *dp
+	c.levels = append([]AddressIndex(nil), dp.levels...)
+	return &c
 }
 
 // populateShortcutsFromLevels fills the BIP-44-style shortcut fields from
@@ -269,7 +318,21 @@ var (
 	}
 )
 
+// ParsePath replaces the path with the result of parsing path under its
+// derivation type. The whole path is replaced, so nothing of a previous path
+// survives (a ZIP-32 index, the BIP-44 shortcuts of a path later parsed as
+// SLIP-10); on error the path is left unchanged.
 func (dp *DerivationPath) ParsePath(path string) error {
+	fresh := DerivationPath{derivationType: dp.derivationType}
+	if err := fresh.parse(path); err != nil {
+		return err
+	}
+	*dp = fresh
+	return nil
+}
+
+// parse fills dp, which carries only its derivation type, from path.
+func (dp *DerivationPath) parse(path string) error {
 	rx, ok := derivationIndex[dp.derivationType]
 	if !ok {
 		return fmt.Errorf("%w: %q", ErrInvalidDerivationType, dp.derivationType)
@@ -287,8 +350,11 @@ func (dp *DerivationPath) ParsePath(path string) error {
 		return fmt.Errorf("%w: %q", ErrInvalidDerivationPath, path)
 	}
 
+	// A level's index has 31 bits: a BIP-32 child number keeps the hardened
+	// flag in its top bit (n' is 2^31+n), so an index of 2^31 or more would
+	// name another level's key. Refused at every level, hardened or not.
 	parseUint := func(s, label string) (uint32, error) {
-		v, err := strconv.ParseUint(s, 10, 32)
+		v, err := strconv.ParseUint(s, 10, 31)
 		if err != nil {
 			return 0, fmt.Errorf("%w: cannot parse %s %q: %s", ErrInvalidDerivationPath, label, s, err)
 		}
@@ -385,6 +451,9 @@ func (dp *DerivationPath) ParsePath(path string) error {
 		// Generic SLIP-0010: split the path manually to extract per-level
 		// index and hardening marker. The regex above only validates shape.
 		segments := strings.Split(path[2:], "/") // skip leading "m/"
+		if len(segments) > maxSlip10Depth {
+			return fmt.Errorf("%w: %d levels, at most %d", ErrInvalidDerivationPath, len(segments), maxSlip10Depth)
+		}
 		levels := make([]AddressIndex, 0, len(segments))
 		for i, seg := range segments {
 			hardened := false
@@ -508,15 +577,20 @@ func (dp *DerivationPath) rebuildLevels() {
 }
 
 // Levels returns the canonical level-by-level view of the derivation path.
-// Empty for ROOT.
+// Empty for ROOT. The slice is a copy: changing it does not change the path.
 func (dp *DerivationPath) Levels() []AddressIndex {
-	return dp.levels
+	return append([]AddressIndex(nil), dp.levels...)
 }
 
 // String returns the canonical textual form of the derivation path.
 // Hardened markers are emitted as `'` regardless of which marker (`'`, `H`,
-// `h`) appeared in the input.
+// `h`) appeared in the input. A path whose type is set but which has no
+// levels yet (none was parsed or constructed) is empty: rendering the zero
+// shortcuts would name a path nobody gave.
 func (dp *DerivationPath) String() string {
+	if dp.derivationType != ROOT && len(dp.levels) == 0 {
+		return ``
+	}
 	switch dp.derivationType {
 	case ROOT:
 		return ``

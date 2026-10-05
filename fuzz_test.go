@@ -58,6 +58,11 @@ func FuzzParseURN(f *testing.F) {
 		if again.String() != serialized {
 			t.Fatalf("not idempotent:\n once:  %s\n twice: %s\n input: %q", serialized, again.String(), src)
 		}
+		// The levels a wallet derives from must survive the round trip.
+		if !samePath(addr.DerivationPath(), again.DerivationPath()) {
+			t.Fatalf("path changed on re-parse: %v -> %v (input: %q)",
+				addr.DerivationPath().Levels(), again.DerivationPath().Levels(), src)
+		}
 	})
 }
 
@@ -69,10 +74,10 @@ func FuzzParseURN(f *testing.F) {
 func FuzzDerivationPath(f *testing.F) {
 	// Seeds: one valid path per known derivation type plus a few degenerate
 	// inputs that have historically been weak spots (variable-length ZIP-32,
-	// SLIP-10 with mixed hardening, hardened leaf, max-uint32 indices, etc).
+	// SLIP-10 with mixed hardening, hardened leaf, the largest index, etc).
 	seeds := []struct{ dt, path string }{
 		{"bip32", "m/0'/0/0"},
-		{"bip32", "m/2147483647'/1/4294967295'"},
+		{"bip32", "m/2147483647'/1/2147483647'"}, // largest index, 2^31-1
 		{"bip44", "m/44'/60'/0'/0/0"},
 		{"bip44", "m/44'/0'/0'/0/0'"}, // hardened leaf
 		{"bip49", "m/49'/0'/0'/0/0"},
@@ -96,7 +101,9 @@ func FuzzDerivationPath(f *testing.F) {
 		{"bip44", "m/44'/0'/0'/0"}, // missing leaf
 		{"slip10", "m"},
 		{"slip10", "m/"},
-		{"slip10", "m/99999999999999999999"}, // overflow
+		{"slip10", "m/99999999999999999999"},   // overflow
+		{"bip32", "m/2147483648'/1/0"},         // index 2^31
+		{"bip44", "m/44'/60'/0'/0/4294967295"}, // index 2^32-1
 		{"unknown", "m/0/0/0"},
 	}
 	for _, s := range seeds {
@@ -124,13 +131,26 @@ func FuzzDerivationPath(f *testing.F) {
 				serialized, dp2.String(), dt, path)
 		}
 
+		// String() and Levels() describe the same path.
+		if !samePath(dp, dp2) {
+			t.Fatalf("path changed on re-parse: %v -> %v (input: dt=%q path=%q)", dp.Levels(), dp2.Levels(), dt, path)
+		}
+
+		// No accepted level may carry an index of 2^31 or more.
+		for i, lvl := range dp.Levels() {
+			if lvl.Index > 1<<31-1 {
+				t.Fatalf("level[%d] = %d is above 2^31-1 (input: dt=%q path=%q)", i, lvl.Index, dt, path)
+			}
+		}
+
 		// Levels() must always be safe to call (may be empty for ROOT).
 		_ = dp.Levels()
 	})
 }
 
 // FuzzParseNSS targets the lower-level byte parser. Same contract as
-// FuzzParseURN: no panics, idempotent on success.
+// FuzzParseURN: no panics, and on success the emitted URN re-parses to
+// itself.
 func FuzzParseNSS(f *testing.F) {
 	for _, s := range uriMHDA {
 		f.Add(s[prefixOffset:])
@@ -138,6 +158,8 @@ func FuzzParseNSS(f *testing.F) {
 	for _, s := range []string{
 		"", "n", "nt", "nt:", "nt:evm", "nt:evm:ci:1:ct:60", "nt:evm:ci:1",
 		"nt:evm:ci:1:wt:web3:wi:5f2a8c31",
+		"nt:evm:ci:1?=q:dt:bip44:dp:m/44'/60'/0'/0/0",
+		"nt:evm:ci:1:wi:a#b",
 	} {
 		f.Add(s)
 	}
@@ -150,7 +172,16 @@ func FuzzParseNSS(f *testing.F) {
 		if addr == nil {
 			t.Fatalf("ParseNSS returned (nil, nil) for %q", src)
 		}
-		_ = addr.String()
-		_ = addr.NSS()
+		serialized := addr.String()
+		if serialized != prefixMHDA+addr.NSS() {
+			t.Fatalf("String() %q is not the prefix plus NSS() %q", serialized, addr.NSS())
+		}
+		again, err := ParseURN(serialized)
+		if err != nil {
+			t.Fatalf("re-parse of %q (from NSS %q) failed: %v", serialized, src, err)
+		}
+		if again.String() != serialized {
+			t.Fatalf("not idempotent:\n once:  %s\n twice: %s\n input: %q", serialized, again.String(), src)
+		}
 	})
 }

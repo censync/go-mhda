@@ -77,7 +77,7 @@ var knownComponents = func() map[string]struct{} {
 // RFC 8141 §5.1: the leading "urn:" sequence and the NID are case-insensitive
 // (e.g. "URN:MHDA:..." must parse identically to "urn:mhda:...").
 func hasPrefixFold(s, prefix string) bool {
-	return len(s) >= len(prefix) && strings.EqualFold(s[:len(prefix)], prefix)
+	return len(s) >= len(prefix) && asciiLower(s[:len(prefix)]) == asciiLower(prefix)
 }
 
 // asciiTrim trims ASCII whitespace only. Unicode spaces (NBSP, ideographic
@@ -86,18 +86,47 @@ func hasPrefixFold(s, prefix string) bool {
 // check rejects it loudly. Trimming it instead (as a Unicode-aware trim
 // would) silently accepts a malformed URN and diverges from the C++ port.
 func asciiTrim(s string) string {
-	return strings.Trim(s, " \t\n\v\f\r")
+	return strings.Trim(s, asciiSpace)
 }
 
-// validateValueCharset enforces SPEC §1.5: NSS values consist of printable
-// ASCII only. Control characters, whitespace of any kind and non-ASCII bytes
-// are rejected — they cannot appear in a conforming URN and would serialise
-// into a non-parseable or ambiguous canonical form.
+// asciiSpace is the ASCII whitespace asciiTrim removes.
+const asciiSpace = " \t\n\v\f\r"
+
+// nssByte reports whether c may appear in an NSS key or value (SPEC §1.5):
+// an RFC 3986 pchar or "/" - letters, digits and -._~!$&'()*+,;=@/ - except
+// ':' (the component separator) and '%' (percent-encoding is not supported,
+// and a raw "%41" would be a second spelling of "A"). Whitespace, control
+// bytes, non-ASCII bytes and the printable ASCII outside pchar ('"', '<',
+// '>', '\', '^', '`', '{', '|', '}', '[', ']', '?', '#') cannot appear in a
+// conforming URN.
+func nssByte(c byte) bool {
+	switch {
+	case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9':
+		return true
+	}
+	return strings.IndexByte("-._~!$&'()*+,;=@/", c) >= 0
+}
+
+// validateValueCharset enforces SPEC §1.5 on an NSS value (see nssByte).
 func validateValueCharset(key, value string) error {
 	for i := 0; i < len(value); i++ {
-		if value[i] < 0x21 || value[i] > 0x7e {
-			return fmt.Errorf("%w: non-ASCII or control byte in value for %q",
-				ErrInvalidNSS, key)
+		if !nssByte(value[i]) {
+			return fmt.Errorf("%w: byte %q not allowed in value for %q",
+				ErrInvalidNSS, value[i], key)
+		}
+	}
+	return nil
+}
+
+// validateKeyCharset requires a component key to be non-empty and made of
+// the same bytes as values (see nssByte).
+func validateKeyCharset(key string) error {
+	if key == "" {
+		return fmt.Errorf("%w: empty component key", ErrInvalidNSS)
+	}
+	for i := 0; i < len(key); i++ {
+		if !nssByte(key[i]) {
+			return fmt.Errorf("%w: byte %q not allowed in component key %q", ErrInvalidNSS, key[i], key)
 		}
 	}
 	return nil
@@ -122,7 +151,10 @@ func ParseURN(src string) (MHDA, error) {
 	if !hasPrefixFold(src, prefixMHDA) {
 		return nil, ErrInvalidURN
 	}
-	return ParseNSS(stripRQF(src[prefixOffset:]))
+	// Whitespace left before a stripped r/q/f component ("ci:0 #frag") ends
+	// the URN like the whitespace trimmed above; any other whitespace in the
+	// NSS is malformed and parseNSS refuses it.
+	return parseAddressNSS(strings.TrimRight(stripRQF(src[prefixOffset:]), asciiSpace))
 }
 
 // ParseURNStrict is ParseURN + Validate(). It rejects URNs whose
@@ -142,8 +174,15 @@ func ParseURNStrict(src string) (MHDA, error) {
 }
 
 // ParseNSS parses an MHDA namespace-specific string into an MHDA address.
-// Requires the network type ("nt") component to be present.
+// Requires the network type ("nt") component to be present. Surrounding ASCII
+// whitespace is trimmed; whitespace inside the NSS is refused.
 func ParseNSS(nss string) (MHDA, error) {
+	return parseAddressNSS(asciiTrim(nss))
+}
+
+// parseAddressNSS parses an NSS without surrounding whitespace into an
+// address.
+func parseAddressNSS(nss string) (MHDA, error) {
 	components, err := parseNSS(nss)
 	if err != nil {
 		return nil, err
@@ -157,47 +196,61 @@ func ParseNSS(nss string) (MHDA, error) {
 // parseNSS is the shared low-level NSS parser. It returns the raw component
 // map; callers (ParseNSS, ChainFromNSS) interpret the map per their domain.
 //
-// Form: a sequence of `key:value` pairs joined by `:` separators. Unknown
-// keys are silently skipped (forward-compat with future URN extensions);
-// duplicate keys and empty values are rejected.
+// Form: a sequence of `key:value` pairs joined by `:` separators; an empty
+// NSS has no components. A pair with an unknown key is skipped together with
+// its value (forward-compat with future URN extensions), so a value is never
+// read as a key and a following known key is never read as a value. A key
+// that differs from a known key only by case is rejected, not skipped: it
+// would drop the component silently. A key without a value, an empty key or
+// value and a duplicate known key are rejected too. Nothing is trimmed: the
+// caller removes whitespace around the whole NSS, and whitespace around a key
+// or value is malformed input.
+//
+// '?' and '#' open the RFC 8141 r/q/f components. ParseURN strips them before
+// the NSS reaches this parser; an NSS that still carries one (ParseNSS,
+// ChainFromNSS, ChainFromKey) is rejected, since the URN emitted from it would
+// be truncated at that byte on the next parse.
 //
 // Values may not contain ':'; this holds for every component currently
 // defined in MHDA. Adding a value type that needs ':' would require
 // percent-encoding support.
 func parseNSS(nss string) (map[string]string, error) {
-	parts := strings.Split(nss, ":")
 	components := make(map[string]string, len(componentsNames))
+	if nss == "" {
+		return components, nil
+	}
+	if i := strings.IndexAny(nss, "?#"); i >= 0 {
+		return nil, fmt.Errorf("%w: %q inside the NSS", ErrInvalidNSS, nss[i])
+	}
+	parts := strings.Split(nss, ":")
+	if len(parts)%2 != 0 {
+		return nil, fmt.Errorf("%w: missing value for %q", ErrInvalidNSS, parts[len(parts)-1])
+	}
 
-	for i := 0; i < len(parts); {
+	for i := 0; i < len(parts); i += 2 {
 		key := parts[i]
-		if _, ok := knownComponents[key]; !ok {
-			// Unknown token (could be an unrelated word, a future component
-			// name, or part of a value we mis-identified). Skip and move on.
-			i++
-			continue
+		if err := validateKeyCharset(key); err != nil {
+			return nil, err
 		}
-		if i+1 >= len(parts) {
-			return nil, fmt.Errorf("%w: missing value for %q", ErrInvalidNSS, key)
-		}
-		// RFC 8141 NSS does not permit unescaped whitespace; trim ASCII
-		// whitespace so any trailing space (e.g. from "ci:0 #frag" where
-		// stripRQF leaves the space) does not leak into the canonical form
-		// and break round-trip.
-		value := asciiTrim(parts[i+1])
+		value := parts[i+1]
 		if value == "" {
 			return nil, fmt.Errorf("%w: empty value for %q", ErrInvalidNSS, key)
 		}
-		// Everything that survives the trim must be printable ASCII —
-		// interior whitespace, control bytes and Unicode spaces are all
-		// malformed input, never silently normalised.
+		// A value is printable ASCII: whitespace, control bytes and Unicode
+		// spaces are malformed input, never silently normalised.
 		if err := validateValueCharset(key, value); err != nil {
 			return nil, err
+		}
+		if _, ok := knownComponents[key]; !ok {
+			if _, ok := knownComponents[asciiLower(key)]; ok {
+				return nil, fmt.Errorf("%w: component key %q must be lowercase", ErrInvalidNSS, key)
+			}
+			continue // unknown component, skipped with its value
 		}
 		if _, dup := components[key]; dup {
 			return nil, fmt.Errorf("%w: duplicate component %q", ErrInvalidNSS, key)
 		}
 		components[key] = value
-		i += 2
 	}
 	return components, nil
 }

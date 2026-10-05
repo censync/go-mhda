@@ -180,9 +180,10 @@ func TestStrictPreservesLenient(t *testing.T) {
 func TestBitcoinFormats(t *testing.T) {
 	for _, urn := range []string{
 		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2pkh`,
-		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip44:dp:m/44'/0'/0'/0/0:af:p2sh`,
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip49:dp:m/49'/0'/0'/0/0:af:p2sh`,
 		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2wpkh`,
-		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip84:dp:m/84'/0'/0'/0/0:af:p2wsh`,
+		// P2WSH has no single-key purpose (multisig is BIP-48): plain bip32.
+		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip32:dp:m/0'/0/0:af:p2wsh`,
 		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip84:dp:m/84'/0'/0'/0/0:af:bech32`,
 		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip86:dp:m/86'/0'/0'/0/0:af:p2tr`,
 		`urn:mhda:nt:bitcoin:ci:bitcoin:ct:0:dt:bip86:dp:m/86'/0'/0'/0/0:af:bech32m`,
@@ -265,7 +266,7 @@ func TestREADMEExamples(t *testing.T) {
 		`urn:mhda:nt:solana:ci:mainnet:dt:slip10:dp:m/44'/501'/0'/0'`,
 		// XRP Ledger
 		`urn:mhda:nt:xrpl:ci:mainnet:dt:bip44:dp:m/44'/144'/0'/0/0`,
-		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519`,
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:aa:ed25519`,
 		// Stellar
 		`urn:mhda:nt:stellar:ci:mainnet:dt:slip10:dp:m/44'/148'/0'`,
 		// NEAR
@@ -771,8 +772,8 @@ func TestXRP(t *testing.T) {
 		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0`,
 		// long form with explicit defaults
 		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:secp256k1:af:base58`,
-		// ed25519 variant (XLS-10 / XUMM-style)
-		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519:af:base58`,
+		// ed25519 keys come from a family seed, not an HD path: root form
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:aa:ed25519:af:base58`,
 	} {
 		addr, err := ParseURNStrict(urn)
 		if err != nil {
@@ -803,6 +804,8 @@ func TestXRPRejectsInvalidCombos(t *testing.T) {
 	bad := []string{
 		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:aa:sr25519`, // unsupported algo
 		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:af:hex`,     // unsupported format
+		// ed25519 has no soft levels, so it cannot derive this BIP-44 path
+		`urn:mhda:nt:xrpl:ci:mainnet:ct:144:dt:bip44:dp:m/44'/144'/0'/0/0:aa:ed25519`,
 	}
 	for _, urn := range bad {
 		_, err := ParseURNStrict(urn)
@@ -892,6 +895,44 @@ func TestCIP1852Levels(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("level[%d]: got %+v, want %+v", i, got[i], want[i])
 		}
+	}
+}
+
+// TestWideChargeLevel: the CIP-11 charge and the CIP-1852 role take any
+// level index. A value above 255 must keep its full width - truncated to a
+// byte, role 256 would name the role-0 key.
+func TestWideChargeLevel(t *testing.T) {
+	cases := []struct {
+		urn  string
+		want uint32
+	}{
+		{`urn:mhda:nt:cardano:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/256/0`, 256},
+		{`urn:mhda:nt:cardano:ci:mainnet:dt:cip1852:dp:m/1852'/1815'/0'/2147483647/0`, 2147483647},
+		{`urn:mhda:nt:cosmos:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/257/0`, 257},
+		{`urn:mhda:nt:cosmos:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/65536/0`, 65536},
+	}
+	for _, c := range cases {
+		addr, err := ParseURNStrict(c.urn)
+		if err != nil {
+			t.Errorf("ParseURNStrict(%q): %v", c.urn, err)
+			continue
+		}
+		if addr.String() != c.urn {
+			t.Errorf("round-trip:\n got:  %s\n want: %s", addr.String(), c.urn)
+		}
+		dp := addr.DerivationPath()
+		if uint32(dp.Charge()) != c.want {
+			t.Errorf("%q: Charge() = %d, want %d", c.urn, dp.Charge(), c.want)
+		}
+		if got := dp.Levels()[3]; got != (AddressIndex{Index: c.want}) {
+			t.Errorf("%q: level[3] = %+v, want {%d false}", c.urn, got, c.want)
+		}
+	}
+
+	role := uint32(300)
+	dp := NewDerivationPath(CIP1852, ADA, 0, ChargeType(role), AddressIndex{Index: 1})
+	if got, want := dp.String(), `m/1852'/1815'/0'/300/1`; got != want {
+		t.Errorf("NewDerivationPath role 300: String() = %q, want %q", got, want)
 	}
 }
 
@@ -1307,13 +1348,10 @@ func TestDerivationTypeAccessor(t *testing.T) {
 // TestMarshalTextNilAddress ensures MarshalText returns a sentinel error
 // rather than panicking on an uninitialised receiver.
 func TestMarshalTextNilAddress(t *testing.T) {
-	var a *Address // nil
-	_, err := a.MarshalText()
-	if !errors.Is(err, ErrUninitializedAddress) {
-		t.Errorf("nil receiver: got %v, want ErrUninitializedAddress", err)
-	}
+	// A nil *Address is encoded by the codec (as null, see
+	// TestTextCodecsWithAddressValues); MarshalText has a value receiver.
 	a2 := &Address{} // zero-value, no chain
-	_, err = a2.MarshalText()
+	_, err := a2.MarshalText()
 	if !errors.Is(err, ErrUninitializedAddress) {
 		t.Errorf("zero-value: got %v, want ErrUninitializedAddress", err)
 	}
@@ -1714,6 +1752,57 @@ func TestHashFunctions(t *testing.T) {
 	}
 	if iface.NSSHash256() != addr1.NSSHash256() {
 		t.Error("MHDA.NSSHash256() mismatch with concrete method")
+	}
+}
+
+// TestHashReferenceVectors pins the four digests at the SHA-1/SHA-256 block
+// and padding boundaries: str() of 55, 56, 63, 64, 119, 120, 128 and 1000
+// bytes (the NSS is 9 bytes shorter, so it covers 55 too). The values were
+// computed with Python's hashlib and are shared with the C++ port, whose
+// hashes are hand-written.
+func TestHashReferenceVectors(t *testing.T) {
+	cases := []struct {
+		size                               int
+		hash, hash256, nssHash, nssHash256 string
+	}{
+		{55, "7230ec9cac1176541d5e454a5977547849806ef3", "4bcf74edcd630246d1cb1f03be5dc2deb7cc850270a2d3f279d68166778e2065",
+			"3c1704aa5f179b7d21a9f726e20473ac2b5786e1", "c85613e0a6562581d353224545cbebc3710ddb496d4b03baddd435fa311b7bbb"},
+		{56, "7c08382a5672e118ef014b54c8d1b42e7b6cb90b", "a176aa8ff4ccdcb7b05e3e39440cc40b8b17219910f3081c062045abbf331255",
+			"8f17a0079072eb355e316ebdbb73aa4328762ff7", "242f19fedc19e36ab9c4378b45922e731269ea04c325b58c4a90d4389ffce482"},
+		{63, "6b6034fd2e44f4ad8ea9da946a6915f017966ead", "0be4d717499d1b2a081c60cf64f0c59b5e09a1a0da1e65c497c83e839caef655",
+			"4b8360e09c0db0f1c423342d03db990ee4795695", "0bd7a04f6ca2b30eca17273961fa78db6f345e654ed80ac78a85d780d73d0267"},
+		{64, "c5b9fb4f88ee7f77e14566483838fe03eb5f722a", "be3e95721333ec68988eedb3b6c37c7c48ee30211c3bef96900609e8f1dd3546",
+			"fba8bdfdfb761ca75bc1a38886a7219cba376adc", "713ea1b363b46219865aded589c56341e7d0e63c9278e7e11ae154f05883d1c5"},
+		{119, "91f3a5706cdf32541f6c2d45ea4280399da43847", "d04d2a8a7f6df456cada8d263a746f0d21e4b600ef7bdcea4f6e645c17d94914",
+			"94285bd9afc8f49eb2059992f3660aee22e76063", "d3398acc7f987d3d3c90acd2e4ef958bd7053a8a88e4b2d51b5774b0fb03cfdc"},
+		{120, "8f7e2ab8a8a0c101e299154982f0e262bf43b7d0", "a4ed7ff3b82d6f7fa7a322ca72971a2b1e6474a5d08475599bc965282acb49c7",
+			"7eb1dc21b8685d3b9dbc9c2cbb9240acc90a2660", "aba04d6e4a96a9f662bb9ac433ba50f2c34d7991aee8cb2787ab91bc4228e88a"},
+		{128, "56e36e13d0581067945cd12955e3ce4b21967a48", "b6fb21cc83b07ab98648ec0b1bb04a3d79cd31d231cc07303d24ce73145a46ed",
+			"c792663db1797615b2433d56b96bf73d859a3e6f", "2c04bb624a604bd96c5b0e4b9e1006bbe898f134b60a40a1ed81d63e03897ea7"},
+		{1000, "f3acba196b25a975d6989beef6693337b5987f26", "7d57f53b9e4785b1735151906fd63ccb70547a8a2292986b613cf23db7b0f3d7",
+			"d16eb7a3991c6ace27d58b3e80e617567cfd242b", "2e7dd698a37e3fb7660b19bcad20b60677bd1e7f01d79870daa09a8a1f7269d8"},
+	}
+	for _, c := range cases {
+		urn := `urn:mhda:nt:evm:ci:` + strings.Repeat("x", c.size-19)
+		addr, err := ParseURN(urn)
+		if err != nil {
+			t.Fatalf("ParseURN(%d bytes): %v", c.size, err)
+		}
+		if got := len(addr.String()); got != c.size {
+			t.Fatalf("String() is %d bytes, want %d", got, c.size)
+		}
+		if got := addr.Hash(); got != c.hash {
+			t.Errorf("%d bytes: Hash() = %s, want %s", c.size, got, c.hash)
+		}
+		if got := addr.Hash256(); got != c.hash256 {
+			t.Errorf("%d bytes: Hash256() = %s, want %s", c.size, got, c.hash256)
+		}
+		if got := addr.NSSHash(); got != c.nssHash {
+			t.Errorf("%d bytes: NSSHash() = %s, want %s", c.size, got, c.nssHash)
+		}
+		if got := addr.NSSHash256(); got != c.nssHash256 {
+			t.Errorf("%d bytes: NSSHash256() = %s, want %s", c.size, got, c.nssHash256)
+		}
 	}
 }
 

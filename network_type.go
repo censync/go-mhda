@@ -1,6 +1,6 @@
 package go_mhda
 
-import "errors"
+import "fmt"
 
 type NetworkType string
 
@@ -47,7 +47,7 @@ func NetworkTypeFromString(src string) (NetworkType, error) {
 	if result, ok := ntIndex[normalize(src)]; ok {
 		return result, nil
 	}
-	return "", errors.New("undefined network type")
+	return "", fmt.Errorf("%w: %q", ErrInvalidNetworkType, src)
 }
 
 func (nt NetworkType) IsValid() bool {

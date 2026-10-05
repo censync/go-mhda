@@ -19,7 +19,16 @@ urn:mhda:nt:<network>:ci:<chain_id>:ct:<slip44>:dt:<derivation>:dp:<path>:aa:<al
 
 The `urn:` and the NID `mhda` are case-insensitive (RFC 8141 §5.1). Component
 keys (`nt`, `dt`, etc.) are lowercase by convention and are accepted only in
-that form. Enum-valued components (`nt`, `dt`, `aa`, `af`) normalise to
+that form: a key that differs from a known key only by case (`DT`, `Wi`) is
+refused with `ErrInvalidNSS`, never skipped.
+
+The NSS is a sequence of `key:value` pairs. A pair whose key is not one of
+the components below is skipped together with its value, for forward
+compatibility with future components; a value is therefore never read as a
+key. A key without a value (a dangling token, a trailing `:`), an empty key
+or value, and a repeated known key are refused with `ErrInvalidNSS`.
+
+Enum-valued components (`nt`, `dt`, `aa`, `af`) normalise to
 lowercase in the canonical form; free-form values (`ci`, `ap`, `as`, `wt`,
 `wi`) are case-preserving and round-trip verbatim.
 
@@ -41,7 +50,15 @@ lowercase in the canonical form; free-form values (`ci`, `ap`, `as`, `wt`,
 
 Optional components are emitted in canonical output ONLY when explicitly set.
 A short input form round-trips back to the same short form; a long form
-round-trips back to the same long form.
+round-trips back to the same long form. The one exception is `dt:root`:
+root is the default derivation type and carries no path, so an explicit
+`dt:root` is folded away and `...:ci:1:dt:root` serialises as `...:ci:1`.
+A root address therefore has a single canonical form (and a single hash).
+
+`dp` is present exactly when `dt` is a type other than `root`. A `dp`
+without `dt` (which makes the address root) or with `dt:root` is refused
+with `ErrInvalidDerivationPath`: dropping it would make the URN name the root
+key instead of the path it spells out.
 
 The chain identity is the `(nt, ci)` pair. The `ct` component is OPTIONAL
 SLIP-44 coin-type metadata: it never participates in the chain identity or in
@@ -75,15 +92,28 @@ interpreted; they are stripped before parsing:
 Example: `urn:mhda:nt:evm:ci:1?+resolver=example.com#sec` parses
 identically to the bare URN; `String()` does not preserve these elements.
 
+An NSS given on its own (`ParseNSS`, `ChainFromNSS`, `ChainFromKey`) has no
+r/q/f components to strip, so it must not contain `?` or `#` at all; such
+input is refused with `ErrInvalidNSS`. Kept in a value, the byte would
+truncate the URN emitted from it on the next parse.
+
 ### 1.5 Charset
 
-NSS values must consist of ASCII characters allowed by RFC 8141 NSS production
-(`pchar / "/"` per RFC 3986). The reference implementation enforces printable
-ASCII (0x21–0x7E) for every value: control bytes, whitespace of any kind and
-non-ASCII bytes are rejected. Only ASCII whitespace is trimmed around the URN
-and around values — a Unicode space is malformed input, never decoration to
-strip. Percent-encoding is not implemented; if a value needs to contain `:`
-(currently no in-tree value does), percent-encoding support must be added.
+NSS keys and values must consist of ASCII characters allowed by RFC 8141 NSS
+production (`pchar / "/"` per RFC 3986): letters, digits and
+`-._~!$&'()*+,;=@/`. `:` separates components and is never part of a value.
+`%` is rejected too: percent-encoding is not implemented, and a raw `%41`
+would be a second spelling of `A` (if a value ever needs `:`, percent-encoding
+support must be added first). Everything else — whitespace, control bytes,
+non-ASCII bytes and the printable ASCII outside that set
+(``"<>\^`{|}[]?#``) — is rejected with `ErrInvalidNSS`.
+
+ASCII whitespace is trimmed only around the whole URN (or around an NSS or
+chain key parsed on its own), never around a key or value inside it; a
+Unicode space is malformed input, never decoration to strip. The setters and
+the `...FromString` helpers follow the same rule: they trim ASCII whitespace
+and fold ASCII case only, so a Unicode letter that lowercases to an ASCII one
+(the Kelvin sign `K`) is not another spelling.
 
 ### 1.6 Wallet domain
 
@@ -101,9 +131,10 @@ When set, the wallet domain participates in the serialised NSS (and therefore
 in the NSS hashes, §9); it is never part of the chain key.
 
 Because these values are typically client-supplied, the setters validate them
-against NSS-corrupting characters: a value may not contain `:` (component
-injection on re-parse), `?` or `#` (RFC 8141 r/q/f truncation), or
-whitespace. The same rule applies to the free-form `ap` / `as` values.
+against the §1.5 byte set and return `ErrInvalidValue` otherwise: in
+particular a value may not contain `:` (component injection on re-parse),
+`?` or `#` (RFC 8141 r/q/f truncation), or whitespace. The same rule applies
+to the free-form `ap` / `as` values and to the chain id.
 
 ## 2. Network Catalogue
 
@@ -142,13 +173,18 @@ keeps the family name rather than any flagship chain's name.
 ### 2.1 Per-network notes
 
 #### Bitcoin (`bitcoin`)
-Multiple legitimate scripts; format must be specified explicitly under strict
-validation. `ap` is conventionally `1` (P2PKH), `3` (P2SH), `bc1q` (bech32),
-`bc1p` (bech32m / Taproot).
+Multiple legitimate scripts, so there is no default format and `af` may be
+omitted. When given, it must match the script the purpose defines, under
+strict validation: `bip44` p2pkh, `bip49` p2sh, `bip84` p2wpkh or bech32,
+`bip86` p2tr or bech32m; `bip32` takes any. `ap` is conventionally `1`
+(P2PKH), `3` (P2SH), `bc1q` (bech32), `bc1p` (bech32m / Taproot).
 
 #### Ethereum and EVM clones (`evm`)
 Single canonical format (hex). Chain ID typically a numeric chain ID such as
-`1`, `0xa86a`, `0x10`.
+`1`, `0xa86a`, `0x10`. The chain id is opaque: MHDA does not canonicalise
+it, so `ci:1`, `ci:0x1` and `ci:01` are three different chain keys (and
+hashes) for one chain. Chain keys compare as strings; a producer must keep to
+one spelling for a chain (the EIP-155 decimal form is the usual choice).
 
 #### Avalanche (`avalanche`)
 C-Chain uses hex (EVM-compatible); X/P-Chain use bech32 with HRPs `X-avax`,
@@ -157,6 +193,8 @@ C-Chain uses hex (EVM-compatible); X/P-Chain use bech32 with HRPs `X-avax`,
 #### Cosmos (`cosmos`)
 Cosmos chains traditionally use BIP-44 with coin type 118; some deployments
 register their own SLIP-44 entries. CIP-11 is `m/44'/118'/account'/charge_extra/address`.
+`bip44` with coin `118'` is the same path as `cip11`, so strict validation
+refuses it and keeps the `cip11` spelling; `bip44` with another coin stays.
 
 #### Solana (`solana`)
 SLIP-10 ed25519 only. Common path forms: `m/44'/501'`, `m/44'/501'/account'`,
@@ -164,7 +202,9 @@ SLIP-10 ed25519 only. Common path forms: `m/44'/501'`, `m/44'/501'/account'`,
 
 #### XRP Ledger (`xrpl`)
 secp256k1 is the historical default; ed25519 is supported by newer wallets.
-Addresses use base58 with XRPL's custom alphabet (start with `r`).
+XRPL ed25519 keys come from a family seed, not an HD path, so their URN is
+root (`aa:ed25519`, no `dt`); `bip44` with ed25519 fails strict validation
+(see §6.2). Addresses use base58 with XRPL's custom alphabet (start with `r`).
 
 #### Stellar (`stellar`)
 SEP-0005 mandates SLIP-10 ed25519 with `m/44'/148'/account'` (3 levels, all
@@ -175,11 +215,14 @@ SEP-0023. Common version bytes: `G` (account), `S` (seed), `M` (muxed),
 #### NEAR (`near`)
 ed25519-implicit accounts use raw 64-char hex of pubkey. ETH-implicit accounts
 use `0x` + 40 hex from secp256k1 + keccak256. Named accounts (`alice.near`)
-are not HD-derived and not represented by MHDA.
+are not HD-derived and not represented by MHDA. ed25519 keys derive through
+`slip10`, secp256k1 keys through `bip44`; strict validation holds each
+derivation type to its curve.
 
 #### Aptos (`aptos`)
 ed25519 path `m/44'/637'/account'/change'/index'` (all 5 hardened, enforced by
 aptos-ts-sdk). secp256k1 path `m/44'/637'/account'/change/index` (BIP-44).
+Strict validation holds `slip10` to ed25519 and `bip44` to secp256k1.
 
 #### Sui (`sui`)
 The signature scheme is encoded in the `purpose` field of the path:
@@ -191,7 +234,9 @@ secp256r1:  m/74'/784'/account'/change/index     (BIP-32, purpose=74')
 ```
 
 Address = Blake2b-256(flag || pubkey), 0x + 64 hex chars. Flag bytes:
-0x00 ed25519, 0x01 secp256k1, 0x02 secp256r1.
+0x00 ed25519, 0x01 secp256k1, 0x02 secp256r1. Strict validation holds each
+derivation type to its scheme: `slip10` ed25519, `bip54` secp256k1, `bip74`
+secp256r1.
 
 #### Cardano (`cardano`)
 BIP32-Ed25519 (extended keys with soft-derivation, distinct from SLIP-10
@@ -202,9 +247,9 @@ CIP-19); Byron-era addresses use base58 and remain on-chain.
 
 #### Algorand (`algorand`)
 Native scheme is non-HD: a 25-word BIP-39-style mnemonic encodes the
-32-byte ed25519 seed directly. Canonical URNs use `dt:root`. Some third-party
-wallets layer SLIP-10 at `m/44'/283'/account'/0'/0'`; this is accepted but is
-not Algorand-canonical.
+32-byte ed25519 seed directly. Canonical URNs are root (no `dt`/`dp`). Some
+third-party wallets layer SLIP-10 at `m/44'/283'/account'/0'/0'`; this is
+accepted but is not Algorand-canonical.
 
 #### TON (`ton`)
 Native scheme is non-HD: a 24-word TON-specific mnemonic (different word list
@@ -231,7 +276,7 @@ protocol messages.
 | bip74    | `m/74'/coin'/account'/charge/index[']`                | 5       | sui-keys/src/key_derive.rs (Sui secp256r1)                             |
 | bip84    | `m/84'/coin'/account'/charge/index[']`                | 5       | https://github.com/bitcoin/bips/blob/master/bip-0084.mediawiki         |
 | bip86    | `m/86'/coin'/account'/charge/index[']`                | 5       | https://github.com/bitcoin/bips/blob/master/bip-0086.mediawiki         |
-| slip10   | `m(/uint32['])+`  (variable length)                   | 1+      | https://github.com/satoshilabs/slips/blob/master/slip-0010.md          |
+| slip10   | `m(/index['])+`  (variable length)                    | 1-255   | https://github.com/satoshilabs/slips/blob/master/slip-0010.md          |
 | cip11    | `m/44'/118'/account'/charge_extra/index[']`           | 5       | https://github.com/confio/cosmos-hd-key-derivation-spec                |
 | cip1852  | `m/1852'/1815'/account'/role/index[']`                | 5       | https://github.com/cardano-foundation/CIPs/blob/master/CIP-1852/       |
 | zip32    | `m/32'/133'/account'[/index[']]`                      | 3 or 4  | https://zips.z.cash/zip-0032                                           |
@@ -240,11 +285,24 @@ Hardening markers in input: `'`, `H`, or `h` are all accepted and normalised
 to `'` in canonical output. The trailing `[']` on `index` denotes that the
 leaf level itself may be hardened.
 
+Each level's index is 0..2^31-1 (at most `2147483647`); the hardened marker
+is a separate flag, so `n'` is BIP-32 child number 2^31+n. An index of 2^31
+or more is refused at every level of every derivation type, hardened or not:
+it collides with the hardened bit and would name the key of another path.
+
+Leading zeros are accepted in a variable level and dropped in canonical
+output (`m/44'/060'/0'/0/0` is `m/44'/60'/0'/0/0`); the range applies to the
+value. A fixed level (the purpose, the fixed coin of `cip11`, `cip1852` and
+`zip32`, the `0`/`1` charge of `bip32` and the BIP-44 family) must be spelled
+exactly as in the template.
+
 ### 3.1 Variable-length paths
 
-`slip10` accepts any number of levels and is the right type for chains whose
+`slip10` accepts 1 to 255 levels and is the right type for chains whose
 HD derivation does not fit a fixed shape (Solana, Stellar, Aptos ed25519,
-Sui ed25519, NEAR, Ledger TON).
+Sui ed25519, NEAR, Ledger TON). The upper bound is BIP-32's: a key's depth
+is serialised in one byte, so a deeper path is refused with
+`ErrInvalidDerivationPath`.
 
 `zip32` accepts both 3-level (`m/32'/133'/account'`) and 4-level
 (`m/32'/133'/account'/index[']`) forms; both round-trip exactly.
@@ -254,6 +312,14 @@ Sui ed25519, NEAR, Ledger TON).
 Regardless of derivation type, the canonical level-by-level view is exposed
 via `DerivationPath.Levels()`. For BIP-family schemes the BIP-44 shortcut
 fields (`Coin`, `Account`, `Charge`, `AddressIndex`) are also populated.
+
+`Levels()` and `String()` always describe the same path. A path built in code
+(`NewDerivationPath`, `NewDerivationPathFromLevels`) must be one the parser
+would produce from its own `String()`: levels that do not fit the type (a
+BIP-44 path with purpose `49'`, an unhardened account, too few levels, a
+SLIP-10 path with none) or an index of 2^31 or more panic with
+`ErrInvalidDerivationPath`. `Levels()` returns a copy, and `NewAddress` keeps
+its own copies of the chain and the path it is given.
 
 ## 4. Algorithms
 
@@ -298,11 +364,16 @@ Performs structural validation only:
 - Network type is one of the registered values.
 - Coin type, if present, is a valid 32-bit unsigned integer, spelled as
   plain decimal or `0x`-prefixed hex only (no other integer-literal forms).
-- Values contain no whitespace (interior whitespace is rejected; surrounding
-  whitespace around the whole URN is trimmed).
+- Values contain no whitespace. ASCII whitespace around the whole URN (or
+  around an NSS or chain key parsed on its own, or before a stripped r/q/f
+  component) is trimmed; around a key or value inside the NSS it is
+  rejected.
 - Chain ID is non-empty.
 - Derivation type, if present, is one of the registered constants.
-- Derivation path, if present, matches the regex of its derivation type.
+- Derivation path, if present, matches the regex of its derivation type,
+  and every level's index is below 2^31 (§3).
+- Derivation path is present if and only if the derivation type is set and
+  is not `root` (§1.2).
 - Algorithm, if present, is one of the registered constants.
 - Format, if present, is one of the registered constants.
 
@@ -317,6 +388,27 @@ compatibility set. Defaults are applied first, so a short URN is validated
 as if rewritten in long form.
 
 ROOT is always accepted regardless of network.
+
+Strict validation also refuses combinations no wallet can derive or that
+name one key twice:
+
+- ed25519 with any unhardened level, except under `cip1852`: SLIP-10
+  derives ed25519 keys through hardened levels only (CIP-1852 is
+  BIP32-Ed25519, which has soft derivation).
+- A derivation type with a curve other than its own where the network binds
+  them (Sui, Aptos, NEAR; see §2.1).
+- A Bitcoin format that does not match the purpose of the path (§2.1).
+- A Cosmos `bip44` path with coin `118'`, which is the `cip11` path.
+
+These fail with `ErrIncompatible`; lenient parsing still accepts the paths.
+
+An address built in code can have a derivation type without a path:
+`SetDerivationType` with a new type drops the old path, which belongs to the
+old scheme. Such an address serialises with `dt` but no `dp`, so its URN does
+not parse, and `Validate` / `MarshalText` refuse it with
+`ErrInvalidDerivationPath`. `SetDerivation(dt, dp)` sets both at once and
+changes nothing unless both are valid. `ParsePath` replaces the whole path,
+or leaves it unchanged on error.
 
 ### 6.3 Round-trip semantics
 
@@ -346,9 +438,9 @@ text.
 | `ErrMissingChainID`          | `ci` absent                                              |
 | `ErrCoinTypeInChainKey`      | `ChainFromKey` input carries `ct` (pre-1.1 key format)   |
 | `ErrInvalidChainKey`         | `ChainFromKey` input is not the canonical identity form  |
-| `ErrInvalidValue`            | Free-form setter value with `:`/`?`/`#`/whitespace       |
+| `ErrInvalidValue`            | Free-form or chain id value outside the §1.5 byte set    |
 | `ErrInvalidDerivationType`   | `dt` value not registered                                |
-| `ErrInvalidDerivationPath`   | `dp` does not match the regex of `dt`                    |
+| `ErrInvalidDerivationPath`   | `dp` does not fit `dt` (or no `dt`), or an index >= 2^31 |
 | `ErrInvalidAlgorithm`        | `aa` value not registered                                |
 | `ErrInvalidFormat`           | `af` value not registered                                |
 | `ErrIncompatible`            | Strict validation: triple not allowed for the network    |
@@ -398,6 +490,16 @@ with its own factory functions:
 | `ChainFromNSS(s string)`   | Extract the chain domain from any NSS (lenient).         |
 | `ChainFromKey(key)`        | Parse a `ChainKey` (alias of string) produced by `Key()`.|
 
+Values set programmatically are written verbatim into every URN and chain
+key, so they are validated like parsed input. `NewChain`,
+`Chain.SetNetworkType` and `Chain.SetChainId` require a registered network
+type and a non-empty chain id (ASCII-trimmed) of printable ASCII without
+`:`, `?` or `#`; a `:` would otherwise inject components on re-parse.
+`NewChain` panics on an invalid value; the setters return
+`ErrInvalidNetworkType`, `ErrMissingChainID` or `ErrInvalidValue` and leave
+the chain unchanged. `NewDerivationPath` and `NewDerivationPathFromLevels`
+panic with `ErrInvalidDerivationType` on an unregistered derivation type.
+
 `Chain.String()` and `Chain.Key()` both return the canonical chain key
 `nt:<network>:ci:<chainid>`, suitable for use as a map key, cache key or
 content hash input. The format is a strict prefix of any full URN NSS, so
@@ -430,7 +532,9 @@ This automatically provides:
 - Any framework that consults `TextMarshaler` for value serialisation.
 
 `MarshalText` returns the canonical URN form. `UnmarshalText` accepts any
-valid input (lenient mode).
+valid input (lenient mode). `MarshalText` has a value receiver, so an
+`Address` held by value (a struct field, a map value) encodes as its URN as
+well; a nil `*Address` is encoded by the codec itself (JSON `null`).
 
 A `database/sql` adapter is not currently provided; callers can wrap
 `MarshalText`/`UnmarshalText` in their own `driver.Valuer` / `sql.Scanner`.
@@ -443,12 +547,18 @@ A `database/sql` adapter is not currently provided; callers can wrap
   model. A future `dt:substrate` could be added if needed.
 
 - **Algorand** and **TON** native schemes are not hierarchical. Their
-  canonical URN form uses `dt:root` (no `dp`). HD forms (`m/44'/283'/...` /
+  canonical URN form is root (no `dt`, no `dp`). HD forms (`m/44'/283'/...` /
   `m/44'/607'/...`) are wallet-specific layering on top, not protocol-canonical.
 
 - **Sui** uses the `purpose` field of the derivation path to encode the
   signature scheme (44'/54'/74'). This is supported via three distinct
   derivation types (`bip44`, `bip54`, `bip74`).
+
+- **ZIP-32** (`dt:zip32`) parses, but no network registers it: Zcash is not
+  a registered network type, and its shielded keys use curves (Jubjub,
+  Pallas) outside the algorithm catalogue. `ParseURNStrict` therefore
+  refuses every `zip32` URN with `ErrIncompatible`; only lenient parsing
+  accepts one.
 
 - **Hardening markers** are accepted in three input forms (`'`, `H`, `h`)
   but always serialised canonically as `'`. Round-trip

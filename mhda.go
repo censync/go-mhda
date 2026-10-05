@@ -54,8 +54,11 @@ type Address struct {
 // exactly like parsed input; an invalid value panics (programmer error at a
 // construction site — mirroring the NewDerivationPath precedent). The parse
 // entry points never panic.
+//
+// The address keeps its own copies of chain and path: changing them later,
+// or another address built from them, does not change this one.
 func NewAddress(chain *Chain, path *DerivationPath, params ...string) *Address {
-	a := &Address{chain: chain, path: path}
+	a := &Address{chain: chain.clone(), path: path.clone()}
 	get := func(i int) string {
 		if i < len(params) {
 			return params[i]
@@ -82,10 +85,7 @@ func parseAddress(m map[string]string) (MHDA, error) {
 
 	mhda := &Address{chain: chain}
 
-	if err := mhda.SetDerivationType(m[compDerivationType]); err != nil {
-		return nil, err
-	}
-	if err := mhda.SetDerivationPath(m[compDerivationPath]); err != nil {
+	if err := mhda.SetDerivation(m[compDerivationType], m[compDerivationPath]); err != nil {
 		return nil, err
 	}
 	if err := mhda.SetAddressAlgorithm(m[compAddressAlgorithm]); err != nil {
@@ -132,7 +132,15 @@ func (a *Address) Algorithm() Algorithm {
 	if a.addressAlgorithm != "" {
 		return a.addressAlgorithm
 	}
-	return defaultAlgorithm(a.chain.networkType)
+	return defaultAlgorithm(a.networkType())
+}
+
+// networkType returns the chain's network type, or "" without a chain.
+func (a *Address) networkType() NetworkType {
+	if a.chain == nil {
+		return ""
+	}
+	return a.chain.networkType
 }
 
 // Format returns the explicitly set address format or, if none was set, the
@@ -142,32 +150,57 @@ func (a *Address) Format() Format {
 	if a.addressFormat != "" {
 		return a.addressFormat
 	}
-	return defaultFormat(a.chain.networkType)
+	return defaultFormat(a.networkType())
 }
 
+// SetDerivationType sets the derivation type; an empty string means ROOT.
+// A type other than the current one drops the current path, which belongs to
+// the old scheme: until SetDerivationPath sets a new one the address has no
+// path, its URN carries dt without dp, and Validate / MarshalText refuse it.
+// Setting the current type again keeps the path. Use SetDerivation to change
+// both at once.
 func (a *Address) SetDerivationType(dt string) error {
-	dt = strings.TrimSpace(dt)
-	dt = strings.ToLower(dt)
+	dt = normalize(dt)
 
-	if a.path == nil {
-		a.path = &DerivationPath{}
-	}
-
+	next := ROOT
 	if dt != `` {
 		if _, ok := derivationIndex[DerivationType(dt)]; !ok {
 			return fmt.Errorf("%w: %q", ErrInvalidDerivationType, dt)
 		}
-
-		a.path.derivationType = DerivationType(dt)
-	} else {
-		a.path.derivationType = ROOT
+		next = DerivationType(dt)
 	}
 
+	if a.path == nil || a.path.derivationType != next {
+		a.path = &DerivationPath{derivationType: next}
+	}
 	return nil
 }
 
+// SetDerivation sets the derivation type and path together, as a parsed URN
+// does: both are validated first, and the address changes only if both are
+// valid. An empty dt means ROOT, which takes an empty dp.
+func (a *Address) SetDerivation(dt, dp string) error {
+	var scratch Address
+	if err := scratch.SetDerivationType(dt); err != nil {
+		return err
+	}
+	if err := scratch.SetDerivationPath(dp); err != nil {
+		return err
+	}
+	a.path = scratch.path
+	return nil
+}
+
+// SetDerivationPath parses dp under the address' derivation type. A root
+// address has no path: an empty dp is accepted, anything else is refused
+// with ErrInvalidDerivationPath. Dropping it instead would let a URN with a
+// dp but no dt (which parses as root) name the root key rather than the
+// path it spells out.
 func (a *Address) SetDerivationPath(dp string) error {
-	if a.path.derivationType == ROOT {
+	if a.path == nil || a.path.derivationType == ROOT {
+		if p := asciiTrim(dp); p != `` {
+			return fmt.Errorf("%w: root derivation must have empty path, got %q", ErrInvalidDerivationPath, p)
+		}
 		return nil
 	}
 
@@ -176,8 +209,7 @@ func (a *Address) SetDerivationPath(dp string) error {
 		return fmt.Errorf("%w: unknown derivation type %q", ErrInvalidDerivationPath, a.path.derivationType)
 	}
 
-	dp = strings.TrimSpace(dp)
-	dp = strings.ToLower(dp)
+	dp = normalize(dp)
 
 	if !rx.MatchString(dp) {
 		return fmt.Errorf("%w: %q", ErrInvalidDerivationPath, dp)
@@ -190,9 +222,13 @@ func (a *Address) SetDerivationPath(dp string) error {
 
 // SetCoinType sets the optional SLIP-44 coin-type metadata on the address'
 // chain. Passing an empty string clears it. Accepted spellings are plain
-// decimal and 0x-prefixed hex (see parseCoinType).
+// decimal and 0x-prefixed hex (see parseCoinType). An address without a
+// chain returns ErrUninitializedAddress.
 func (a *Address) SetCoinType(ct string) error {
-	ct = strings.TrimSpace(ct)
+	if a.chain == nil {
+		return ErrUninitializedAddress
+	}
+	ct = asciiTrim(ct)
 	if ct == `` {
 		a.chain.ClearCoinType()
 		return nil
@@ -207,15 +243,15 @@ func (a *Address) SetCoinType(ct string) error {
 	return nil
 }
 
-// validateFreeFormValue guards the case-preserving free-form components
-// (ap/as/wt/wi) against characters that would corrupt the serialised NSS:
-// the ':' component separator would inject foreign components on re-parse,
-// '?' / '#' would truncate the URN at the RFC 8141 r/q/f delimiters, and
-// anything outside printable ASCII (whitespace of any kind, control bytes,
-// Unicode) cannot appear in a conforming NSS at all.
+// validateFreeFormValue guards a value written verbatim into the NSS
+// (ap/as/wt/wi and the chain id) with the NSS byte set (see nssByte): the ':'
+// component separator would inject foreign components on re-parse, '?' / '#'
+// would truncate the URN at the RFC 8141 r/q/f delimiters, and whitespace,
+// control bytes, Unicode and the rest of the printable ASCII outside RFC 3986
+// pchar cannot appear in a conforming NSS at all.
 func validateFreeFormValue(component, v string) error {
 	for i := 0; i < len(v); i++ {
-		if v[i] < 0x21 || v[i] > 0x7e || v[i] == ':' || v[i] == '?' || v[i] == '#' {
+		if !nssByte(v[i]) {
 			return fmt.Errorf("%w: %q for %q", ErrInvalidValue, v, component)
 		}
 	}
@@ -223,8 +259,7 @@ func validateFreeFormValue(component, v string) error {
 }
 
 func (a *Address) SetAddressAlgorithm(aa string) error {
-	aa = strings.TrimSpace(aa)
-	aa = strings.ToLower(aa)
+	aa = normalize(aa)
 	if aa == `` {
 		a.addressAlgorithm = ""
 		return nil
@@ -237,8 +272,7 @@ func (a *Address) SetAddressAlgorithm(aa string) error {
 }
 
 func (a *Address) SetAddressFormat(af string) error {
-	af = strings.TrimSpace(af)
-	af = strings.ToLower(af)
+	af = normalize(af)
 	if af == `` {
 		a.addressFormat = ""
 		return nil
@@ -319,20 +353,29 @@ func (a *Address) String() string {
 func (a *Address) NSS() string {
 	var b strings.Builder
 
-	// Chain identity - always present.
-	_, _ = fmt.Fprintf(&b, "nt:%s:ci:%s", a.chain.networkType, a.chain.chainId)
+	// Chain identity - always present (empty without a chain, like the zero
+	// Chain).
+	chain := a.chain
+	if chain == nil {
+		chain = &Chain{}
+	}
+	_, _ = fmt.Fprintf(&b, "nt:%s:ci:%s", chain.networkType, chain.chainId)
 
 	// Coin-type metadata - emitted only when explicitly set.
-	if a.chain.hasCoinType {
-		_, _ = fmt.Fprintf(&b, ":ct:%d", a.chain.coinType)
+	if chain.hasCoinType {
+		_, _ = fmt.Fprintf(&b, ":ct:%d", chain.coinType)
 	}
 
-	// Derivation domain - present when not ROOT.
-	if a.path != nil && a.path.derivationType != ROOT {
+	// Derivation domain - present when a type other than ROOT is set. A type
+	// set without a path yet is emitted without dp, so the URN fails to parse
+	// rather than name another key.
+	if a.path != nil && a.path.derivationType != ROOT && a.path.derivationType != "" {
 		b.WriteString(":dt:")
 		b.WriteString(string(a.path.derivationType))
-		b.WriteString(":dp:")
-		b.WriteString(a.path.String())
+		if p := a.path.String(); p != "" {
+			b.WriteString(":dp:")
+			b.WriteString(p)
+		}
 	}
 
 	// Address-format metadata - emitted only when explicitly set.
@@ -397,12 +440,26 @@ func (a *Address) NSSHash256() string {
 
 // MarshalText implements encoding.TextMarshaler. This is the integration point
 // for encoding/json, encoding/xml, gopkg.in/yaml.v3 and similar codecs - they
-// will produce the URN form automatically.
-func (a *Address) MarshalText() ([]byte, error) {
-	if a == nil || a.chain == nil {
+// will produce the URN form automatically. The value receiver lets an Address
+// held by value (a struct field, a map value) encode too; codecs encode a nil
+// *Address themselves (as null) without calling it.
+func (a Address) MarshalText() ([]byte, error) {
+	if a.chain == nil {
 		return nil, ErrUninitializedAddress
 	}
+	if err := a.checkPathSet(); err != nil {
+		return nil, err
+	}
 	return []byte(a.String()), nil
+}
+
+// checkPathSet reports a derivation type set without a path (see
+// SetDerivationType): such an address serialises to a URN that does not parse.
+func (a *Address) checkPathSet() error {
+	if a.path != nil && a.path.derivationType != ROOT && a.path.derivationType != "" && len(a.path.levels) == 0 {
+		return fmt.Errorf("%w: derivation type %q is set without a path", ErrInvalidDerivationPath, a.path.derivationType)
+	}
+	return nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.

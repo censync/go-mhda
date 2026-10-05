@@ -80,6 +80,20 @@ func TestChainFromKeyRejectsExtraComponents(t *testing.T) {
 	}
 }
 
+// TestChainParsersRefuseRQFDelimiters: '?' and '#' open the RFC 8141 r/q/f
+// components; a chain key or NSS carrying one in a value would be truncated
+// once embedded in a URN.
+func TestChainParsersRefuseRQFDelimiters(t *testing.T) {
+	for _, s := range []string{`nt:evm:ci:1#a`, `nt:evm:ci:1?=q`, `nt:evm:ci:a?b`} {
+		if _, err := ChainFromKey(ChainKey(s)); !errors.Is(err, ErrInvalidNSS) {
+			t.Errorf("ChainFromKey(%q): got %v, want ErrInvalidNSS", s, err)
+		}
+		if _, err := ChainFromNSS(s); !errors.Is(err, ErrInvalidNSS) {
+			t.Errorf("ChainFromNSS(%q): got %v, want ErrInvalidNSS", s, err)
+		}
+	}
+}
+
 // TestChainFromNSSAcceptsOptionalCoinType: the lenient NSS extractor accepts
 // the optional ct metadata (in any position) and keeps it off the key.
 func TestChainFromNSSAcceptsOptionalCoinType(t *testing.T) {
