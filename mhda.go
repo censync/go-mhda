@@ -132,7 +132,15 @@ func (a *Address) Algorithm() Algorithm {
 	if a.addressAlgorithm != "" {
 		return a.addressAlgorithm
 	}
-	return defaultAlgorithm(a.chain.networkType)
+	return defaultAlgorithm(a.networkType())
+}
+
+// networkType returns the chain's network type, or "" without a chain.
+func (a *Address) networkType() NetworkType {
+	if a.chain == nil {
+		return ""
+	}
+	return a.chain.networkType
 }
 
 // Format returns the explicitly set address format or, if none was set, the
@@ -142,7 +150,7 @@ func (a *Address) Format() Format {
 	if a.addressFormat != "" {
 		return a.addressFormat
 	}
-	return defaultFormat(a.chain.networkType)
+	return defaultFormat(a.networkType())
 }
 
 // SetDerivationType sets the derivation type; an empty string means ROOT.
@@ -190,7 +198,7 @@ func (a *Address) SetDerivation(dt, dp string) error {
 // dp but no dt (which parses as root) name the root key rather than the
 // path it spells out.
 func (a *Address) SetDerivationPath(dp string) error {
-	if a.path.derivationType == ROOT {
+	if a.path == nil || a.path.derivationType == ROOT {
 		if p := strings.TrimSpace(dp); p != `` {
 			return fmt.Errorf("%w: root derivation must have empty path, got %q", ErrInvalidDerivationPath, p)
 		}
@@ -216,8 +224,12 @@ func (a *Address) SetDerivationPath(dp string) error {
 
 // SetCoinType sets the optional SLIP-44 coin-type metadata on the address'
 // chain. Passing an empty string clears it. Accepted spellings are plain
-// decimal and 0x-prefixed hex (see parseCoinType).
+// decimal and 0x-prefixed hex (see parseCoinType). An address without a
+// chain returns ErrUninitializedAddress.
 func (a *Address) SetCoinType(ct string) error {
+	if a.chain == nil {
+		return ErrUninitializedAddress
+	}
 	ct = strings.TrimSpace(ct)
 	if ct == `` {
 		a.chain.ClearCoinType()
@@ -345,12 +357,17 @@ func (a *Address) String() string {
 func (a *Address) NSS() string {
 	var b strings.Builder
 
-	// Chain identity - always present.
-	_, _ = fmt.Fprintf(&b, "nt:%s:ci:%s", a.chain.networkType, a.chain.chainId)
+	// Chain identity - always present (empty without a chain, like the zero
+	// Chain).
+	chain := a.chain
+	if chain == nil {
+		chain = &Chain{}
+	}
+	_, _ = fmt.Fprintf(&b, "nt:%s:ci:%s", chain.networkType, chain.chainId)
 
 	// Coin-type metadata - emitted only when explicitly set.
-	if a.chain.hasCoinType {
-		_, _ = fmt.Fprintf(&b, ":ct:%d", a.chain.coinType)
+	if chain.hasCoinType {
+		_, _ = fmt.Fprintf(&b, ":ct:%d", chain.coinType)
 	}
 
 	// Derivation domain - present when a type other than ROOT is set. A type

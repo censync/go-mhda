@@ -242,3 +242,44 @@ func samePath(a, b *DerivationPath) bool {
 		a.Coin() == b.Coin() && a.Account() == b.Account() && a.Charge() == b.Charge() &&
 		a.AddressIndex() == b.AddressIndex()
 }
+
+// TestZeroAndPartialAddressesAreSafe: the zero Address and an address built
+// without a chain or a path behave like the C++ port's default address
+// instead of panicking.
+func TestZeroAndPartialAddressesAreSafe(t *testing.T) {
+	for name, a := range map[string]*Address{
+		"zero":            {},
+		"NewAddress(nil)": NewAddress(nil, nil),
+	} {
+		if got := a.String(); got != `urn:mhda:nt::ci:` {
+			t.Errorf("%s: String() = %q", name, got)
+		}
+		if len(a.Hash256()) != 64 || len(a.NSSHash()) != 40 {
+			t.Errorf("%s: hashes have the wrong length", name)
+		}
+		if a.Algorithm() != "" || a.Format() != "" || a.DerivationType() != ROOT {
+			t.Errorf("%s: algorithm %q format %q type %q", name, a.Algorithm(), a.Format(), a.DerivationType())
+		}
+		if err := a.SetCoinType("60"); !errors.Is(err, ErrUninitializedAddress) {
+			t.Errorf("%s: SetCoinType: got %v, want ErrUninitializedAddress", name, err)
+		}
+		if err := a.Validate(); !errors.Is(err, ErrUninitializedAddress) {
+			t.Errorf("%s: Validate: got %v, want ErrUninitializedAddress", name, err)
+		}
+	}
+
+	// No path means root: an empty path is accepted, any other is refused.
+	a := NewAddress(NewChain(EthereumVM, "1"), nil)
+	if err := a.SetDerivationPath(""); err != nil {
+		t.Errorf("SetDerivationPath(\"\") without a path: %v", err)
+	}
+	if err := a.SetDerivationPath("m/44'/60'/0'/0/0"); !errors.Is(err, ErrInvalidDerivationPath) {
+		t.Errorf("SetDerivationPath without a type: got %v, want ErrInvalidDerivationPath", err)
+	}
+	if err := a.SetDerivation("bip44", "m/44'/60'/0'/0/0"); err != nil {
+		t.Fatal(err)
+	}
+	if got := a.String(); got != `urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0` {
+		t.Errorf("String() = %q", got)
+	}
+}

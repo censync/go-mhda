@@ -101,6 +101,13 @@ of 2^31 or more no longer parses.
 
 ### Fixed
 
+- **No nil dereference on a zero or partial `Address`.** `String()`,
+  `NSS()`, the hashes, `Algorithm()` and `Format()` panicked on the zero
+  `Address` or one built with a nil chain, and `SetDerivationPath` panicked
+  on an address built without a path. They now treat a missing chain as the
+  zero chain (`urn:mhda:nt::ci:`, as the C++ port's default address) and a
+  missing path as root; `SetCoinType` without a chain returns
+  `ErrUninitializedAddress`.
 - **No stale or mixed derivation state.** `ParsePath` updated the fields
   of the path it was given: re-parsing a 4-level ZIP-32 path with a 3-level
   one kept the old index (`m/32'/133'/1'` read back as `m/32'/133'/1'/5`),
