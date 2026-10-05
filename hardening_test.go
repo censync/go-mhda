@@ -381,3 +381,20 @@ func TestNoWhitespaceInsideNSS(t *testing.T) {
 		t.Errorf("ChainFromNSS with a space inside: got %v, want ErrInvalidNSS", err)
 	}
 }
+
+// TestFreeFormValuesUseTheNSSCharset: values set in code obey the same RFC
+// 3986 byte set as parsed ones.
+func TestFreeFormValuesUseTheNSSCharset(t *testing.T) {
+	addr := mustAddress(t, `urn:mhda:nt:evm:ci:1`)
+	for _, v := range []string{"x|y", "a%41", "<id>", `a"b`, "a{b}", "a\\b"} {
+		if err := addr.SetWalletId(v); !errors.Is(err, ErrInvalidValue) {
+			t.Errorf("SetWalletId(%q): got %v, want ErrInvalidValue", v, err)
+		}
+		if err := panicErr(t, func() { NewChain(EthereumVM, ChainId(v)) }); !errors.Is(err, ErrInvalidValue) {
+			t.Errorf("NewChain(%q): panic %v, want ErrInvalidValue", v, err)
+		}
+	}
+	if err := addr.SetWalletId("c0a8f2d4-3b6e_x.y~z@w"); err != nil {
+		t.Errorf("SetWalletId with pchar punctuation: %v", err)
+	}
+}

@@ -122,3 +122,24 @@ accept strict urn:mhda:nt:bitcoin:ci:bitcoin:dt:bip32:dp:m/0'/0/0:af:p2wpkh urn:
 refuse strict incompatible urn:mhda:nt:cosmos:ci:cosmoshub:dt:bip44:dp:m/44'/118'/0'/0/0
 accept strict urn:mhda:nt:cosmos:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/0/0 urn:mhda:nt:cosmos:ci:cosmoshub:dt:cip11:dp:m/44'/118'/0'/0/0
 accept strict urn:mhda:nt:cosmos:ci:secret:dt:bip44:dp:m/44'/529'/0'/0/0 urn:mhda:nt:cosmos:ci:secret:dt:bip44:dp:m/44'/529'/0'/0/0
+
+# NSS bytes are RFC 3986 pchar or "/": letters, digits and -._~!$&'()*+,;=@/,
+# except ':' (the component separator) and '%' (percent-encoding is not
+# supported, and a raw %41 would be a second spelling of "A"). The other
+# printable ASCII bytes cannot appear in a URN at all.
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a"b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a<b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a>b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a\b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a^b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a`b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a{b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a|b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a}b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a[b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a]b
+refuse urn invalid_nss urn:mhda:nt:evm:ci:a%41
+refuse urn invalid_nss urn:mhda:nt:evm:ci:1:wi:x|y
+refuse urn invalid_nss urn:mhda:nt:evm:ci:1:x|y:z
+accept urn urn:mhda:nt:evm:ci:a-b.c_d~e!f$g&h'i(j)k*l+m,n;o=p@q/r urn:mhda:nt:evm:ci:a-b.c_d~e!f$g&h'i(j)k*l+m,n;o=p@q/r
+accept urn urn:mhda:nt:cosmos:ci:cosmoshub-4:ap:X-avax:wi:c0a8f2d4-3b6e urn:mhda:nt:cosmos:ci:cosmoshub-4:ap:X-avax:wi:c0a8f2d4-3b6e

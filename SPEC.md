@@ -99,17 +99,21 @@ truncate the URN emitted from it on the next parse.
 
 ### 1.5 Charset
 
-NSS values must consist of ASCII characters allowed by RFC 8141 NSS production
-(`pchar / "/"` per RFC 3986). The reference implementation enforces printable
-ASCII (0x21–0x7E) for every key and value: control bytes, whitespace of any
-kind and non-ASCII bytes are rejected. ASCII whitespace is trimmed only around
-the whole URN (or around an NSS or chain key parsed on its own), never around
-a key or value inside it; a Unicode space is malformed input, never decoration
-to strip. The setters and the `...FromString` helpers follow the same rule:
-they trim ASCII whitespace and fold ASCII case only, so a Unicode letter that
-lowercases to an ASCII one (the Kelvin sign `K`) is not another spelling.
-Percent-encoding is not implemented; if a value needs to contain `:`
-(currently no in-tree value does), percent-encoding support must be added.
+NSS keys and values must consist of ASCII characters allowed by RFC 8141 NSS
+production (`pchar / "/"` per RFC 3986): letters, digits and
+`-._~!$&'()*+,;=@/`. `:` separates components and is never part of a value.
+`%` is rejected too: percent-encoding is not implemented, and a raw `%41`
+would be a second spelling of `A` (if a value ever needs `:`, percent-encoding
+support must be added first). Everything else — whitespace, control bytes,
+non-ASCII bytes and the printable ASCII outside that set
+(``"<>\^`{|}[]?#``) — is rejected with `ErrInvalidNSS`.
+
+ASCII whitespace is trimmed only around the whole URN (or around an NSS or
+chain key parsed on its own), never around a key or value inside it; a
+Unicode space is malformed input, never decoration to strip. The setters and
+the `...FromString` helpers follow the same rule: they trim ASCII whitespace
+and fold ASCII case only, so a Unicode letter that lowercases to an ASCII one
+(the Kelvin sign `K`) is not another spelling.
 
 ### 1.6 Wallet domain
 
@@ -127,9 +131,10 @@ When set, the wallet domain participates in the serialised NSS (and therefore
 in the NSS hashes, §9); it is never part of the chain key.
 
 Because these values are typically client-supplied, the setters validate them
-against NSS-corrupting characters: a value may not contain `:` (component
-injection on re-parse), `?` or `#` (RFC 8141 r/q/f truncation), or
-whitespace. The same rule applies to the free-form `ap` / `as` values.
+against the §1.5 byte set and return `ErrInvalidValue` otherwise: in
+particular a value may not contain `:` (component injection on re-parse),
+`?` or `#` (RFC 8141 r/q/f truncation), or whitespace. The same rule applies
+to the free-form `ap` / `as` values and to the chain id.
 
 ## 2. Network Catalogue
 
@@ -430,7 +435,7 @@ text.
 | `ErrMissingChainID`          | `ci` absent                                              |
 | `ErrCoinTypeInChainKey`      | `ChainFromKey` input carries `ct` (pre-1.1 key format)   |
 | `ErrInvalidChainKey`         | `ChainFromKey` input is not the canonical identity form  |
-| `ErrInvalidValue`            | Free-form or chain id value with `:`/`?`/`#`/whitespace  |
+| `ErrInvalidValue`            | Free-form or chain id value outside the §1.5 byte set    |
 | `ErrInvalidDerivationType`   | `dt` value not registered                                |
 | `ErrInvalidDerivationPath`   | `dp` does not fit `dt` (or no `dt`), or an index >= 2^31 |
 | `ErrInvalidAlgorithm`        | `aa` value not registered                                |

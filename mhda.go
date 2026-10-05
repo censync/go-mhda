@@ -243,15 +243,15 @@ func (a *Address) SetCoinType(ct string) error {
 	return nil
 }
 
-// validateFreeFormValue guards the case-preserving free-form components
-// (ap/as/wt/wi) against characters that would corrupt the serialised NSS:
-// the ':' component separator would inject foreign components on re-parse,
-// '?' / '#' would truncate the URN at the RFC 8141 r/q/f delimiters, and
-// anything outside printable ASCII (whitespace of any kind, control bytes,
-// Unicode) cannot appear in a conforming NSS at all.
+// validateFreeFormValue guards a value written verbatim into the NSS
+// (ap/as/wt/wi and the chain id) with the NSS byte set (see nssByte): the ':'
+// component separator would inject foreign components on re-parse, '?' / '#'
+// would truncate the URN at the RFC 8141 r/q/f delimiters, and whitespace,
+// control bytes, Unicode and the rest of the printable ASCII outside RFC 3986
+// pchar cannot appear in a conforming NSS at all.
 func validateFreeFormValue(component, v string) error {
 	for i := 0; i < len(v); i++ {
-		if v[i] < 0x21 || v[i] > 0x7e || v[i] == ':' || v[i] == '?' || v[i] == '#' {
+		if !nssByte(v[i]) {
 			return fmt.Errorf("%w: %q for %q", ErrInvalidValue, v, component)
 		}
 	}

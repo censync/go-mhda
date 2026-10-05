@@ -133,6 +133,14 @@ of 2^31 or more no longer parses.
   whole URN, around an NSS or chain key parsed on its own, and before a
   stripped r/q/f component (`ci:0 #frag` still parses); around a key or
   value it is refused with `ErrInvalidNSS`.
+- **NSS bytes follow RFC 3986.** Keys and values accepted any printable
+  ASCII, so `"`, `<`, `>`, `\`, `^`, `` ` ``, `{`, `|`, `}`, `[`, `]` and a
+  raw `%` passed and were emitted in URNs that RFC 8141 does not allow. A
+  key or value is now made of letters, digits and `-._~!$&'()*+,;=@/`
+  only (RFC 3986 pchar and `/`, without `:` and `%`); anything else is
+  `ErrInvalidNSS` when parsed and `ErrInvalidValue` from the setters and
+  `NewChain`. `%` is refused because percent-encoding is not supported and
+  `%41` would be a second spelling of `A`.
 - **No stale or mixed derivation state.** `ParsePath` updated the fields
   of the path it was given: re-parsing a 4-level ZIP-32 path with a 3-level
   one kept the old index (`m/32'/133'/1'` read back as `m/32'/133'/1'/5`),

@@ -92,29 +92,41 @@ func asciiTrim(s string) string {
 // asciiSpace is the ASCII whitespace asciiTrim removes.
 const asciiSpace = " \t\n\v\f\r"
 
-// validateValueCharset enforces SPEC §1.5: NSS values consist of printable
-// ASCII only. Control characters, whitespace of any kind and non-ASCII bytes
-// are rejected — they cannot appear in a conforming URN and would serialise
-// into a non-parseable or ambiguous canonical form.
+// nssByte reports whether c may appear in an NSS key or value (SPEC §1.5):
+// an RFC 3986 pchar or "/" - letters, digits and -._~!$&'()*+,;=@/ - except
+// ':' (the component separator) and '%' (percent-encoding is not supported,
+// and a raw "%41" would be a second spelling of "A"). Whitespace, control
+// bytes, non-ASCII bytes and the printable ASCII outside pchar ('"', '<',
+// '>', '\', '^', '`', '{', '|', '}', '[', ']', '?', '#') cannot appear in a
+// conforming URN.
+func nssByte(c byte) bool {
+	switch {
+	case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9':
+		return true
+	}
+	return strings.IndexByte("-._~!$&'()*+,;=@/", c) >= 0
+}
+
+// validateValueCharset enforces SPEC §1.5 on an NSS value (see nssByte).
 func validateValueCharset(key, value string) error {
 	for i := 0; i < len(value); i++ {
-		if value[i] < 0x21 || value[i] > 0x7e {
-			return fmt.Errorf("%w: non-ASCII or control byte in value for %q",
-				ErrInvalidNSS, key)
+		if !nssByte(value[i]) {
+			return fmt.Errorf("%w: byte %q not allowed in value for %q",
+				ErrInvalidNSS, value[i], key)
 		}
 	}
 	return nil
 }
 
-// validateKeyCharset requires a component key to be non-empty printable
-// ASCII, the same byte range as values.
+// validateKeyCharset requires a component key to be non-empty and made of
+// the same bytes as values (see nssByte).
 func validateKeyCharset(key string) error {
 	if key == "" {
 		return fmt.Errorf("%w: empty component key", ErrInvalidNSS)
 	}
 	for i := 0; i < len(key); i++ {
-		if key[i] < 0x21 || key[i] > 0x7e {
-			return fmt.Errorf("%w: non-ASCII or control byte in component key %q", ErrInvalidNSS, key)
+		if !nssByte(key[i]) {
+			return fmt.Errorf("%w: byte %q not allowed in component key %q", ErrInvalidNSS, key[i], key)
 		}
 	}
 	return nil
