@@ -89,6 +89,11 @@ interpreted; they are stripped before parsing:
 Example: `urn:mhda:nt:evm:ci:1?+resolver=example.com#sec` parses
 identically to the bare URN; `String()` does not preserve these elements.
 
+An NSS given on its own (`ParseNSS`, `ChainFromNSS`, `ChainFromKey`) has no
+r/q/f components to strip, so it must not contain `?` or `#` at all; such
+input is refused with `ErrInvalidNSS`. Kept in a value, the byte would
+truncate the URN emitted from it on the next parse.
+
 ### 1.5 Charset
 
 NSS values must consist of ASCII characters allowed by RFC 8141 NSS production

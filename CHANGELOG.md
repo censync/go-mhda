@@ -62,6 +62,13 @@ of 2^31 or more no longer parses.
   a known key only by case, a dangling token, a trailing `:` and an empty
   key are refused with `ErrInvalidNSS`. `ChainFromKey` reports a dangling
   token as `ErrInvalidChainKey`, as before.
+- **`ParseNSS`, `ChainFromNSS` and `ChainFromKey` refuse `?` and `#`** with
+  `ErrInvalidNSS`. `ParseURN` strips the RFC 8141 r/q/f components before
+  parsing, but an NSS given on its own kept the byte in a value:
+  `ParseNSS("nt:evm:ci:1?=q:dt:bip44:dp:m/44'/60'/0'/0/0")` returned a bip44
+  address whose URN re-parsed as the root address `urn:mhda:nt:evm:ci:1`,
+  and `ChainFromKey("nt:evm:ci:1#a")` was accepted. `FuzzParseNSS` now
+  checks that the emitted URN re-parses to itself.
 
 ### Fixed
 

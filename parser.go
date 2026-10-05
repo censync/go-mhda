@@ -179,6 +179,11 @@ func ParseNSS(nss string) (MHDA, error) {
 // would drop the component silently. A key without a value, an empty key or
 // value and a duplicate known key are rejected too.
 //
+// '?' and '#' open the RFC 8141 r/q/f components. ParseURN strips them before
+// the NSS reaches this parser; an NSS that still carries one (ParseNSS,
+// ChainFromNSS, ChainFromKey) is rejected, since the URN emitted from it would
+// be truncated at that byte on the next parse.
+//
 // Values may not contain ':'; this holds for every component currently
 // defined in MHDA. Adding a value type that needs ':' would require
 // percent-encoding support.
@@ -186,6 +191,9 @@ func parseNSS(nss string) (map[string]string, error) {
 	components := make(map[string]string, len(componentsNames))
 	if nss == "" {
 		return components, nil
+	}
+	if i := strings.IndexAny(nss, "?#"); i >= 0 {
+		return nil, fmt.Errorf("%w: %q inside the NSS", ErrInvalidNSS, nss[i])
 	}
 	parts := strings.Split(nss, ":")
 	if len(parts)%2 != 0 {

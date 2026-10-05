@@ -47,3 +47,13 @@ refuse urn invalid_nss urn:mhda:nt:evm:ci:1:xx:
 refuse urn missing_network_type urn:mhda:
 refuse nss invalid_nss nt:evm:ci:1:foo
 accept nss nt:evm:ci:1:wt:web3 urn:mhda:nt:evm:ci:1:wt:web3
+
+# '?' and '#' open the RFC 8141 r/q/f components. ParseURN strips them with
+# everything after; an NSS passed on its own must not carry them in a value,
+# or the URN emitted from it would be truncated on the next parse.
+refuse nss invalid_nss nt:evm:ci:1?=q:dt:bip44:dp:m/44'/60'/0'/0/0
+refuse nss invalid_nss nt:evm:ci:1#f
+refuse nss invalid_nss nt:evm:ci:1:wi:a?b
+refuse nss invalid_nss nt:evm:ci:1:x#y:z
+accept urn urn:mhda:nt:evm:ci:1?=q:dt:bip44 urn:mhda:nt:evm:ci:1
+accept urn urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0#frag urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0

@@ -139,7 +139,8 @@ func FuzzDerivationPath(f *testing.F) {
 }
 
 // FuzzParseNSS targets the lower-level byte parser. Same contract as
-// FuzzParseURN: no panics, idempotent on success.
+// FuzzParseURN: no panics, and on success the emitted URN re-parses to
+// itself.
 func FuzzParseNSS(f *testing.F) {
 	for _, s := range uriMHDA {
 		f.Add(s[prefixOffset:])
@@ -147,6 +148,8 @@ func FuzzParseNSS(f *testing.F) {
 	for _, s := range []string{
 		"", "n", "nt", "nt:", "nt:evm", "nt:evm:ci:1:ct:60", "nt:evm:ci:1",
 		"nt:evm:ci:1:wt:web3:wi:5f2a8c31",
+		"nt:evm:ci:1?=q:dt:bip44:dp:m/44'/60'/0'/0/0",
+		"nt:evm:ci:1:wi:a#b",
 	} {
 		f.Add(s)
 	}
@@ -159,7 +162,16 @@ func FuzzParseNSS(f *testing.F) {
 		if addr == nil {
 			t.Fatalf("ParseNSS returned (nil, nil) for %q", src)
 		}
-		_ = addr.String()
-		_ = addr.NSS()
+		serialized := addr.String()
+		if serialized != prefixMHDA+addr.NSS() {
+			t.Fatalf("String() %q is not the prefix plus NSS() %q", serialized, addr.NSS())
+		}
+		again, err := ParseURN(serialized)
+		if err != nil {
+			t.Fatalf("re-parse of %q (from NSS %q) failed: %v", serialized, src, err)
+		}
+		if again.String() != serialized {
+			t.Fatalf("not idempotent:\n once:  %s\n twice: %s\n input: %q", serialized, again.String(), src)
+		}
 	})
 }
