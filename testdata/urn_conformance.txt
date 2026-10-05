@@ -57,3 +57,9 @@ refuse nss invalid_nss nt:evm:ci:1:wi:a?b
 refuse nss invalid_nss nt:evm:ci:1:x#y:z
 accept urn urn:mhda:nt:evm:ci:1?=q:dt:bip44 urn:mhda:nt:evm:ci:1
 accept urn urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0#frag urn:mhda:nt:evm:ci:1:dt:bip44:dp:m/44'/60'/0'/0/0
+
+# Root is the default derivation type and carries no path: an explicit
+# dt:root is folded away, so a root address has one canonical form.
+accept urn urn:mhda:nt:ton:ci:mainnet:dt:root urn:mhda:nt:ton:ci:mainnet
+accept urn urn:mhda:nt:algorand:ci:mainnet:ct:283:dt:root:af:base32 urn:mhda:nt:algorand:ci:mainnet:ct:283:af:base32
+accept urn urn:mhda:nt:evm:ci:1:dt:ROOT urn:mhda:nt:evm:ci:1

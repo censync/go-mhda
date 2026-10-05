@@ -272,3 +272,17 @@ func TestProgrammaticValuesCannotInjectComponents(t *testing.T) {
 		t.Errorf("zero DerivationPath: String() = %q, want urn:mhda:nt:evm:ci:1", got)
 	}
 }
+
+// TestZIP32HasNoNetwork pins SPEC §12: zip32 parses leniently, but no
+// network registers it, so strict parsing refuses it on every network.
+func TestZIP32HasNoNetwork(t *testing.T) {
+	for nt := range ntIndex {
+		urn := `urn:mhda:nt:` + nt + `:ci:x:dt:zip32:dp:m/32'/133'/0'`
+		if _, err := ParseURN(urn); err != nil {
+			t.Errorf("ParseURN(%q): %v", urn, err)
+		}
+		if _, err := ParseURNStrict(urn); !errors.Is(err, ErrIncompatible) {
+			t.Errorf("ParseURNStrict(%q): got %v, want ErrIncompatible", urn, err)
+		}
+	}
+}

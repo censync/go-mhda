@@ -50,7 +50,10 @@ lowercase in the canonical form; free-form values (`ci`, `ap`, `as`, `wt`,
 
 Optional components are emitted in canonical output ONLY when explicitly set.
 A short input form round-trips back to the same short form; a long form
-round-trips back to the same long form.
+round-trips back to the same long form. The one exception is `dt:root`:
+root is the default derivation type and carries no path, so an explicit
+`dt:root` is folded away and `...:ci:1:dt:root` serialises as `...:ci:1`.
+A root address therefore has a single canonical form (and a single hash).
 
 `dp` is present exactly when `dt` is a type other than `root`. A `dp`
 without `dt` (which makes the address root) or with `dt:root` is refused
@@ -221,9 +224,9 @@ CIP-19); Byron-era addresses use base58 and remain on-chain.
 
 #### Algorand (`algorand`)
 Native scheme is non-HD: a 25-word BIP-39-style mnemonic encodes the
-32-byte ed25519 seed directly. Canonical URNs use `dt:root`. Some third-party
-wallets layer SLIP-10 at `m/44'/283'/account'/0'/0'`; this is accepted but is
-not Algorand-canonical.
+32-byte ed25519 seed directly. Canonical URNs are root (no `dt`/`dp`). Some
+third-party wallets layer SLIP-10 at `m/44'/283'/account'/0'/0'`; this is
+accepted but is not Algorand-canonical.
 
 #### TON (`ton`)
 Native scheme is non-HD: a 24-word TON-specific mnemonic (different word list
@@ -488,12 +491,18 @@ A `database/sql` adapter is not currently provided; callers can wrap
   model. A future `dt:substrate` could be added if needed.
 
 - **Algorand** and **TON** native schemes are not hierarchical. Their
-  canonical URN form uses `dt:root` (no `dp`). HD forms (`m/44'/283'/...` /
+  canonical URN form is root (no `dt`, no `dp`). HD forms (`m/44'/283'/...` /
   `m/44'/607'/...`) are wallet-specific layering on top, not protocol-canonical.
 
 - **Sui** uses the `purpose` field of the derivation path to encode the
   signature scheme (44'/54'/74'). This is supported via three distinct
   derivation types (`bip44`, `bip54`, `bip74`).
+
+- **ZIP-32** (`dt:zip32`) parses, but no network registers it: Zcash is not
+  a registered network type, and its shielded keys use curves (Jubjub,
+  Pallas) outside the algorithm catalogue. `ParseURNStrict` therefore
+  refuses every `zip32` URN with `ErrIncompatible`; only lenient parsing
+  accepts one.
 
 - **Hardening markers** are accepted in three input forms (`'`, `H`, `h`)
   but always serialised canonically as `'`. Round-trip
