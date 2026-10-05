@@ -82,10 +82,7 @@ func parseAddress(m map[string]string) (MHDA, error) {
 
 	mhda := &Address{chain: chain}
 
-	if err := mhda.SetDerivationType(m[compDerivationType]); err != nil {
-		return nil, err
-	}
-	if err := mhda.SetDerivationPath(m[compDerivationPath]); err != nil {
+	if err := mhda.SetDerivation(m[compDerivationType], m[compDerivationPath]); err != nil {
 		return nil, err
 	}
 	if err := mhda.SetAddressAlgorithm(m[compAddressAlgorithm]); err != nil {
@@ -145,24 +142,42 @@ func (a *Address) Format() Format {
 	return defaultFormat(a.chain.networkType)
 }
 
+// SetDerivationType sets the derivation type; an empty string means ROOT.
+// A type other than the current one drops the current path, which belongs to
+// the old scheme: until SetDerivationPath sets a new one the address has no
+// path, its URN carries dt without dp, and Validate / MarshalText refuse it.
+// Setting the current type again keeps the path. Use SetDerivation to change
+// both at once.
 func (a *Address) SetDerivationType(dt string) error {
 	dt = strings.TrimSpace(dt)
 	dt = strings.ToLower(dt)
 
-	if a.path == nil {
-		a.path = &DerivationPath{}
-	}
-
+	next := ROOT
 	if dt != `` {
 		if _, ok := derivationIndex[DerivationType(dt)]; !ok {
 			return fmt.Errorf("%w: %q", ErrInvalidDerivationType, dt)
 		}
-
-		a.path.derivationType = DerivationType(dt)
-	} else {
-		a.path.derivationType = ROOT
+		next = DerivationType(dt)
 	}
 
+	if a.path == nil || a.path.derivationType != next {
+		a.path = &DerivationPath{derivationType: next}
+	}
+	return nil
+}
+
+// SetDerivation sets the derivation type and path together, as a parsed URN
+// does: both are validated first, and the address changes only if both are
+// valid. An empty dt means ROOT, which takes an empty dp.
+func (a *Address) SetDerivation(dt, dp string) error {
+	var scratch Address
+	if err := scratch.SetDerivationType(dt); err != nil {
+		return err
+	}
+	if err := scratch.SetDerivationPath(dp); err != nil {
+		return err
+	}
+	a.path = scratch.path
 	return nil
 }
 
@@ -335,12 +350,16 @@ func (a *Address) NSS() string {
 		_, _ = fmt.Fprintf(&b, ":ct:%d", a.chain.coinType)
 	}
 
-	// Derivation domain - present when a type other than ROOT is set.
+	// Derivation domain - present when a type other than ROOT is set. A type
+	// set without a path yet is emitted without dp, so the URN fails to parse
+	// rather than name another key.
 	if a.path != nil && a.path.derivationType != ROOT && a.path.derivationType != "" {
 		b.WriteString(":dt:")
 		b.WriteString(string(a.path.derivationType))
-		b.WriteString(":dp:")
-		b.WriteString(a.path.String())
+		if p := a.path.String(); p != "" {
+			b.WriteString(":dp:")
+			b.WriteString(p)
+		}
 	}
 
 	// Address-format metadata - emitted only when explicitly set.
@@ -410,7 +429,19 @@ func (a *Address) MarshalText() ([]byte, error) {
 	if a == nil || a.chain == nil {
 		return nil, ErrUninitializedAddress
 	}
+	if err := a.checkPathSet(); err != nil {
+		return nil, err
+	}
 	return []byte(a.String()), nil
+}
+
+// checkPathSet reports a derivation type set without a path (see
+// SetDerivationType): such an address serialises to a URN that does not parse.
+func (a *Address) checkPathSet() error {
+	if a.path != nil && a.path.derivationType != ROOT && a.path.derivationType != "" && len(a.path.levels) == 0 {
+		return fmt.Errorf("%w: derivation type %q is set without a path", ErrInvalidDerivationPath, a.path.derivationType)
+	}
+	return nil
 }
 
 // UnmarshalText implements encoding.TextUnmarshaler.

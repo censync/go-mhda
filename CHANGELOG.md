@@ -84,6 +84,19 @@ of 2^31 or more no longer parses.
 
 ### Fixed
 
+- **No stale or mixed derivation state.** `ParsePath` updated the fields
+  of the path it was given: re-parsing a 4-level ZIP-32 path with a 3-level
+  one kept the old index (`m/32'/133'/1'` read back as `m/32'/133'/1'/5`),
+  a SLIP-10 path kept the coin, account and charge of a BIP-44 path parsed
+  before it, and an error midway left a half-updated path.
+  `SetDerivationType` changed the type and kept the old path, so a bip44
+  address switched to zip32 serialised as `dt:zip32:dp:m/32'/133'/3'/9`, a
+  valid URN naming a key nobody gave. `ParsePath` now replaces the whole
+  path or nothing. A new derivation type drops the old path; until a path
+  is set the URN carries `dt` without `dp` (and does not parse), and
+  `Validate` / `MarshalText` return `ErrInvalidDerivationPath`. The new
+  `Address.SetDerivation(dt, dp)` sets both at once and changes nothing on
+  error; the URN parser uses it.
 - **`ChargeType` is 32 bits wide (was `uint8`).** The CIP-11 charge and the
   CIP-1852 role accept any level index, but the parsed value was truncated
   to a byte: `m/1852'/1815'/0'/256/0` parsed as role 0, so it named the

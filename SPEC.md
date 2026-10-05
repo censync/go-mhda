@@ -356,6 +356,14 @@ as if rewritten in long form.
 
 ROOT is always accepted regardless of network.
 
+An address built in code can have a derivation type without a path:
+`SetDerivationType` with a new type drops the old path, which belongs to the
+old scheme. Such an address serialises with `dt` but no `dp`, so its URN does
+not parse, and `Validate` / `MarshalText` refuse it with
+`ErrInvalidDerivationPath`. `SetDerivation(dt, dp)` sets both at once and
+changes nothing unless both are valid. `ParsePath` replaces the whole path,
+or leaves it unchanged on error.
+
 ### 6.3 Round-trip semantics
 
 The reference implementation guarantees:

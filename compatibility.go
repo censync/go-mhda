@@ -203,6 +203,9 @@ func (a *Address) Validate() error {
 	if a == nil || a.chain == nil {
 		return ErrUninitializedAddress
 	}
+	if err := a.checkPathSet(); err != nil {
+		return err
+	}
 	compat, ok := networkCompatibility[a.chain.networkType]
 	if !ok {
 		return fmt.Errorf("%w: unknown network type %q", ErrIncompatible, a.chain.networkType)

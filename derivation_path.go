@@ -287,7 +287,21 @@ var (
 	}
 )
 
+// ParsePath replaces the path with the result of parsing path under its
+// derivation type. The whole path is replaced, so nothing of a previous path
+// survives (a ZIP-32 index, the BIP-44 shortcuts of a path later parsed as
+// SLIP-10); on error the path is left unchanged.
 func (dp *DerivationPath) ParsePath(path string) error {
+	fresh := DerivationPath{derivationType: dp.derivationType}
+	if err := fresh.parse(path); err != nil {
+		return err
+	}
+	*dp = fresh
+	return nil
+}
+
+// parse fills dp, which carries only its derivation type, from path.
+func (dp *DerivationPath) parse(path string) error {
 	rx, ok := derivationIndex[dp.derivationType]
 	if !ok {
 		return fmt.Errorf("%w: %q", ErrInvalidDerivationType, dp.derivationType)
@@ -539,8 +553,13 @@ func (dp *DerivationPath) Levels() []AddressIndex {
 
 // String returns the canonical textual form of the derivation path.
 // Hardened markers are emitted as `'` regardless of which marker (`'`, `H`,
-// `h`) appeared in the input.
+// `h`) appeared in the input. A path whose type is set but which has no
+// levels yet (none was parsed or constructed) is empty: rendering the zero
+// shortcuts would name a path nobody gave.
 func (dp *DerivationPath) String() string {
+	if dp.derivationType != ROOT && len(dp.levels) == 0 {
+		return ``
+	}
 	switch dp.derivationType {
 	case ROOT:
 		return ``
